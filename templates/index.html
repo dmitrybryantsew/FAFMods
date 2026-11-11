@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FAF Mod Forge - Unit Stat Editor & Mod Packager</title>
+  <link rel="stylesheet" href="/static/css/spooky.css">
+  <link rel="stylesheet" href="/static/css/app.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-left">
+      <div class="logo-mark">FAF</div>
+      <div>
+        <h1 class="logo-title">MOD FORGE</h1>
+        <p class="logo-subtitle">Click any unit to edit its individual stats</p>
+      </div>
+      <nav class="nav-links">
+        <a href="/" class="nav-link active">⚡ Unit Stat Forge <span class="nav-badge" id="nav-count-buffs">0</span></a>
+        <a href="/limits" class="nav-link limits">🛑 Unit Limiter <span class="nav-badge" id="nav-count-limits">0</span></a>
+        <a href="/popups" class="nav-link popups">📢 Event Popups <span class="nav-badge" id="nav-count-popups">0</span></a>
+        <a href="/relics" class="nav-link relics">💎 Relic Objectives <span class="nav-badge" id="nav-count-relics">0</span></a>
+        <a href="/lootbox" class="nav-link lootbox">🎰 Surprise Casino <span class="nav-badge" id="nav-count-lootbox">0</span></a>
+        <a href="/combined" class="nav-link combined">📦 Combined Mod <span class="nav-badge accent" id="nav-count-combined">0</span></a>
+        <a href="/animator" class="nav-link" style="color: #38bdf8; font-weight: 600;">🦖 Raptor 3D Studio</a>
+      </nav>
+    </div>
+    <div class="header-right">
+      <div class="stats-badge">
+        <span class="badge-label">Total Units:</span>
+        <span class="badge-val" id="total-units-count">0</span>
+      </div>
+      <div class="stats-badge accent">
+        <span class="badge-label">In Mod:</span>
+        <span class="badge-val" id="selected-units-count">0</span>
+      </div>
+      <button class="btn btn-secondary" id="btn-open-folder" title="Open Supreme Commander Mods directory in File Explorer">
+        📁 Open Mods Folder
+      </button>
+    </div>
+  </header>
+
+  <div class="main-layout">
+    <!-- Center / Left: Unit Grid & Filter Tools -->
+    <main class="content-panel">
+      <!-- Search & Filters -->
+      <section class="filters-card">
+        <div class="filter-row search-row">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="filter-search" placeholder="Search by name, description, or unit ID (e.g. Mantis, UEL0106, Fatboy)...">
+            <button id="clear-search" class="btn-clear" style="display: none;">✕</button>
+          </div>
+          <div class="batch-actions">
+            <button class="btn btn-sm btn-outline" id="btn-select-filtered">✓ Select Filtered</button>
+            <button class="btn btn-sm btn-outline" id="btn-deselect-filtered">✕ Deselect Filtered</button>
+            <button class="btn btn-sm btn-ghost" id="btn-clear-selection">Reset All</button>
+          </div>
+        </div>
+
+        <div class="filter-row filter-chips-row">
+          <div class="filter-group">
+            <span class="filter-group-title">Faction:</span>
+            <div class="chips-container" id="faction-chips">
+              <button class="chip active" data-filter="faction" data-val="ALL">All</button>
+              <button class="chip uef" data-filter="faction" data-val="UEF">UEF</button>
+              <button class="chip cybran" data-filter="faction" data-val="Cybran">Cybran</button>
+              <button class="chip aeon" data-filter="faction" data-val="Aeon">Aeon</button>
+              <button class="chip seraphim" data-filter="faction" data-val="Seraphim">Seraphim</button>
+              <button class="chip nomads" data-filter="faction" data-val="Nomads">Nomads</button>
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <span class="filter-group-title">Tech Tier:</span>
+            <div class="chips-container" id="tech-chips">
+              <button class="chip active" data-filter="tech" data-val="ALL">All</button>
+              <button class="chip" data-filter="tech" data-val="T1">T1</button>
+              <button class="chip" data-filter="tech" data-val="T2">T2</button>
+              <button class="chip" data-filter="tech" data-val="T3">T3</button>
+              <button class="chip exp" data-filter="tech" data-val="EXP">EXP</button>
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <span class="filter-group-title">Type:</span>
+            <div class="chips-container" id="type-chips">
+              <button class="chip active" data-filter="type" data-val="ALL">All</button>
+              <button class="chip" data-filter="type" data-val="LAND">Land</button>
+              <button class="chip" data-filter="type" data-val="AIR">Air</button>
+              <button class="chip" data-filter="type" data-val="NAVAL">Naval</button>
+              <button class="chip" data-filter="type" data-val="STRUCTURE">Structure</button>
+              <button class="chip" data-filter="type" data-val="DEFENSE">Defense</button>
+              <button class="chip" data-filter="type" data-val="COMMAND">Command</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Unit Grid -->
+      <section class="unit-grid-container">
+        <div class="unit-grid-header">
+          <span id="filtered-count-text">Showing 503 units</span>
+          <span class="grid-hint">💡 Click any unit to open its stat sliders in the right panel</span>
+        </div>
+        <div class="unit-grid" id="unit-grid">
+          <!-- Populated dynamically by app.js -->
+        </div>
+      </section>
+    </main>
+
+    <!-- Right Sidebar: Unit Inspector & Mod Packaging -->
+    <aside class="sidebar-panel">
+      <!-- Sidebar Tab Navigation -->
+      <div class="sidebar-tabs">
+        <button class="tab-btn active" id="tab-btn-inspector">
+          🎯 Unit Inspector
+        </button>
+        <button class="tab-btn" id="tab-btn-settings">
+          📦 Mod Settings (<span id="tab-mod-count">0</span>)
+        </button>
+      </div>
+
+      <!-- Tab Content 1: Unit Inspector -->
+      <div class="sidebar-card tab-content" id="tab-inspector">
+        <!-- Empty State (When no unit is selected) -->
+        <div id="inspector-empty" class="inspector-empty">
+          <div class="empty-icon">👈</div>
+          <h3>Select a Unit</h3>
+          <p>Click on any unit in the grid to view its base stats and adjust its sliders.</p>
+        </div>
+
+        <!-- Populated Inspector State -->
+        <div id="inspector-body" style="display: none;" class="inspector-body">
+          <div class="inspector-header">
+            <div class="inspector-icon-wrapper">
+              <div id="inspector-icon" class="unit-icon"></div>
+            </div>
+            <div class="inspector-title-area">
+              <div class="inspector-badges">
+                <span id="inspector-badge-faction" class="badge-tag">UEF</span>
+                <span id="inspector-badge-tech" class="badge-tag tech">T1</span>
+                <span id="inspector-badge-type" class="badge-tag type">LAND</span>
+              </div>
+              <h3 id="inspector-name" class="inspector-name">Mech Marine</h3>
+              <div id="inspector-id" class="inspector-id">UEL0106</div>
+              <div id="inspector-desc" class="inspector-desc">Light Assault Bot</div>
+            </div>
+          </div>
+
+          <div class="unit-membership-bar">
+            <button class="btn btn-block btn-toggle-include" id="btn-toggle-include">
+              ✓ Included in Mod (Click to Remove)
+            </button>
+          </div>
+
+          <!-- Quick Presets -->
+          <div class="presets-section">
+            <span class="presets-title">⚡ Quick Presets:</span>
+            <div class="presets-chips">
+              <button class="preset-chip" data-preset="vanilla">Reset 1.0x</button>
+              <button class="preset-chip" data-preset="buff">Balanced Buff (2x)</button>
+              <button class="preset-chip gold" data-preset="god">👑 God Mode</button>
+              <button class="preset-chip" data-preset="sniper">🎯 Sniper Range</button>
+              <button class="preset-chip" data-preset="speed">⚡ Speed Demon</button>
+              <button class="preset-chip" data-preset="swarm">🐜 Swarm (-80% Cost)</button>
+            </div>
+          </div>
+
+          <hr class="divider">
+
+          <h4 class="sliders-section-title">📊 Individual Unit Stat Modifiers</h4>
+
+          <!-- Section 1: Survivability & Shields -->
+          <div class="stat-section-title">🛡️ Survivability & Shields</div>
+
+          <!-- Health Slider -->
+          <div class="stat-control-group">
+            <div class="stat-header">
+              <span class="stat-label">Health (HP)</span>
+              <span class="stat-calc" id="calc-hp">Base: 60 ➔ 120 (2.0x)</span>
+            </div>
+            <div class="slider-row">
+              <input type="range" id="slider-unit-hp" min="0.5" max="10.0" step="0.1" value="2.0">
+              <span class="slider-val-box" id="disp-unit-hp">2.0x</span>
+            </div>
+          </div>
+
+          <!-- Health Regen Slider -->
+          <div class="stat-control-group" id="group-unit-regen">
+            <div class="stat-header">
+              <span class="stat-label">Health Regen Rate</span>
+              <span class="stat-calc" id="calc-regen">Base: 0 ➔ 0 (1.0x)</span>
+            </div>
+            <div class="slider-row">
+              <input type="range" id="slider-unit-regen" min="1.0" max="10.0" step="0.5" value="1.0">
+              <span class="slider-val-box" id="disp-unit-regen">1.0x</span>
+            </div>
+          </div>
+
+          <!-- Shield Max HP Slider (shown if shield) -->
+          <div class="stat-control-group" id="group-unit-shield">
+            <div class="stat-header">
+              <span class="stat-label">Shield Max Health</span>
+              <span class="stat-calc" id="calc-shield">Base: 0 ➔ 0 (1.0x)</span>
+            </div>
+            <div class="slider-row">
+              <input type="range" id="slider-unit-shield" min="1.0" max="10.0" step="0.5" value="1.0">
+              <span class="slider-val-box" id="disp-unit-shield">1.0x</span>
+            </div>
+          </div>
+
+          <!-- Shield Regen Slider (shown if shield) -->
+          <div class="stat-control-group" id="group-unit-shield-regen">
+            <div class="stat-header">
+              <span class="stat-label">Shield Regen Rate</span>
+              <span class="stat-calc" id="calc-shield-regen">Base: 0 ➔ 0 (1.0x)</span>
+            </div>
+            <div class="slider-row">
+              <input type="range" id="slider-unit-shield-regen" min="1.0" max="10.0" step="0.5" value="1.0">
+              <span class="slider-val-box" id="disp-unit-shield-regen">1.0x</span>
+            </div>
+          </div>
+
+          <!-- Section 2: Weapons & Firepower -->
+          <div id="section-weapons">
+            <div class="stat-section-title">⚔️ Weapons & Firepower</div>
+
+            <!-- Weapon Damage Slider (shown if armed) -->
+            <div class="stat-control-group" id="group-unit-damage">
+              <div class="stat-header">
+                <span class="stat-label">Weapon Damage</span>
+                <span class="stat-calc" id="calc-damage">Base: 7 ➔ 14 (2.0x)</span>
+              </div>
+              <div class="slider-row">
+                <input type="range" id="slider-unit-damage" min="1.0" max="10.0" step="0.1" value="1.0">
+                <span class="slider-val-box" id="disp-unit-damage">1.0x</span>
+              </div>
+              <div class="weapon-info-sub" id="disp-weapon-name">Tom Cat Machinegun</div>
+            </div>
+
+            <!-- Weapon Range Slider -->
+            <div class="stat-control-group" id="group-unit-range">
+              <div class="stat-header">
+                <span class="stat-label">Firing Range (MaxRadius)</span>
+                <span class="stat-calc" id="calc-range">Base: 14 ➔ 14 (1.0x)</span>
+              </div>
+              <div class="slider-row">
+                <input type="range" id="slider-unit-range" min="1.0" max="5.0" step="0.1" value="1.0">
+                <span class="slider-val-box" id="disp-unit-range">1.0x</span>
+              </div>
+            </div>
+
+            <!-- Rate of Fire Slider -->
+            <div class="stat-control-group" id="group-unit-rof">
+              <div class="stat-header">
+                <span class="stat-label">Rate of Fire</span>
+                <span class="stat-calc" id="calc-rof">Base: 3.3 ➔ 3.3 (1.0x)</span>
+              </div>
+              <div class="slider-row">
+                <input type="range" id="slider-unit-rof" min="1.0" max="5.0" step="0.1" value="1.0">
+                <span class="slider-val-box" id="disp-unit-rof">1.0x</span>
+              </div>
+            </div>
+
+            <!-- Splash / Blast Radius Slider -->
+            <div class="stat-control-group" id="group-unit-aoe">
+              <div class="stat-header">
+                <span class="stat-label">Blast Splash Radius</span>
+                <span class="stat-calc" id="calc-aoe">Base: 0 ➔ 0 (1.0x)</span>
+              </div>
+              <div class="slider-row">
+                <input type="range" id="slider-unit-aoe" min="1.0" max="5.0" step="0.1" value="1.0">
+                <span class="slider-val-box" id="disp-unit-aoe">1.0x</span>
+              </div>
+            </div>
+
+            <!-- Projectile Velocity Slider -->
+            <div class="stat-control-group" id="group-unit-muzzle-vel">
+              <div class="stat-header">
+                <span class="stat-label">Projectile Flight Speed</span>
+                <span class="stat-calc" id="calc-muzzle-vel">Base: 25 ➔ 25 (1.0x)</span>
+              </div>
+              <div class="slider-row">
+                <input type="range" id="slider-unit-muzzle-vel" min="1.0" max="5.0" step="0.1" value="1.0">
+                <span class="slider-val-box" id="disp-unit-muzzle-vel">1.0x</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 3: Economy & Construction -->
+          <div class="stat-section-title">💰 Economy & Logistics</div>
+
+          <!-- Mass Discount Slider -->
+          <div class="stat-control-group">
+            <div class="stat-header">
+              <span class="stat-label">Mass Cost Refund</span>
+              <span class="stat-calc" id="calc-mass">Base: 30 ➔ 15 (-50%)</span>
+            </div>
+            <div class="slider-row">
+              <input type="range" id="slider-unit-mass" min="0" max="90" step="5" value="0">
+              <span class="slider-val-box" id="disp-unit-mass">0%</span>
+            </div>
+          </div>
+
+          <!-- Energy Discount Slider -->
+          <div class="stat-control-group">
+            <div class="stat-header">
+              <span class="stat-label">Energy Cost Refund</span>
+              <span class="stat-calc" id="calc-energy">Base: 120 ➔ 60 (-50%)</span>
+            </div>
+            <div class="slider-row">
+              <input type="range" id="slider-unit-energy" min="0" max="90" step="5" value="0">
+              <span class="slider-val-box" id="disp-unit-energy">0%</span>
+            </div>
+          </div>
+
+          <!-- Build Time Discount Slider -->
+          <div class="stat-control-group">
+            <div class="stat-header">
+              <span class="stat-label">Build Time Discount</span>
+              <span class="stat-calc" id="calc-buildtime">Base: 200 ➔ 200 (-0%)</span>
+            </div>
+            <div class="slider-row">
+              <input type="range" id="slider-unit-buildtime" min="0" max="90" step="5" value="0">
+              <span class="slider-val-box" id="disp-unit-buildtime">0%</span>
+            </div>
+          </div>
+
+          <!-- Build Rate Slider (shown if factory/engineer) -->
+          <div class="stat-control-group" id="group-unit-buildrate">
+            <div class="stat-header">
+              <span class="stat-label">Engineer / Factory Build Rate</span>
+              <span class="stat-calc" id="calc-buildrate">Base: 20 ➔ 40 (2.0x)</span>
+            </div>
+            <div class="slider-row">
+              <input type="range" id="slider-unit-buildrate" min="1.0" max="10.0" step="0.5" value="1.0">
+              <span class="slider-val-box" id="disp-unit-buildrate">1.0x</span>
+            </div>
+          </div>
+
+          <!-- Resource Production Slider (shown if produces mass/energy) -->
+          <div class="stat-control-group" id="group-unit-prod">
+            <div class="stat-header">
+              <span class="stat-label">Resource Generation (M & E)</span>
+              <span class="stat-calc" id="calc-prod">Base: 0 ➔ 0 (1.0x)</span>
+            </div>
+            <div class="slider-row">
+              <input type="range" id="slider-unit-prod" min="1.0" max="10.0" step="0.5" value="1.0">
+              <span class="slider-val-box" id="disp-unit-prod">1.0x</span>
+            </div>
+          </div>
+
+          <!-- Section 4: Mobility & Sensors -->
+          <div class="stat-section-title">🏃 Mobility & Sensors</div>
+
+          <!-- Movement Speed Slider (shown if mobile) -->
+          <div class="stat-control-group" id="group-unit-speed">
+            <div class="stat-header">
+              <span class="stat-label">Movement Speed</span>
+              <span class="stat-calc" id="calc-speed">Base: 4.2 ➔ 6.3 (1.5x)</span>
+            </div>
+            <div class="slider-row">
+              <input type="range" id="slider-unit-speed" min="1.0" max="5.0" step="0.1" value="1.0">
+              <span class="slider-val-box" id="disp-unit-speed">1.0x</span>
+            </div>
+          </div>
+
+          <!-- Turn Rate Slider (shown if mobile) -->
+          <div class="stat-control-group" id="group-unit-turnrate">
+            <div class="stat-header">
+              <span class="stat-label">Turn Rate / Agility</span>
+              <span class="stat-calc" id="calc-turnrate">Base: 90 ➔ 90 (1.0x)</span>
+            </div>
+            <div class="slider-row">
+              <input type="range" id="slider-unit-turnrate" min="1.0" max="5.0" step="0.1" value="1.0">
+              <span class="slider-val-box" id="disp-unit-turnrate">1.0x</span>
+            </div>
+          </div>
+
+          <!-- Vision Radius Slider -->
+          <div class="stat-control-group" id="group-unit-vision">
+            <div class="stat-header">
+              <span class="stat-label">Vision (Line of Sight)</span>
+              <span class="stat-calc" id="calc-vision">Base: 20 ➔ 20 (1.0x)</span>
+            </div>
+            <div class="slider-row">
+              <input type="range" id="slider-unit-vision" min="1.0" max="5.0" step="0.1" value="1.0">
+              <span class="slider-val-box" id="disp-unit-vision">1.0x</span>
+            </div>
+          </div>
+
+          <!-- Radar Radius Slider (shown if radar/sonar) -->
+          <div class="stat-control-group" id="group-unit-radar">
+            <div class="stat-header">
+              <span class="stat-label">Radar / Sonar Detection Range</span>
+              <span class="stat-calc" id="calc-radar">Base: 0 ➔ 0 (1.0x)</span>
+            </div>
+            <div class="slider-row">
+              <input type="range" id="slider-unit-radar" min="1.0" max="5.0" step="0.1" value="1.0">
+              <span class="slider-val-box" id="disp-unit-radar">1.0x</span>
+            </div>
+          </div>
+
+          <div class="unit-actions-row">
+            <button class="btn btn-sm btn-outline" id="btn-copy-stats" title="Apply these exact multipliers to all other currently included units">
+              📋 Copy to All Included Units
+            </button>
+            <button class="btn btn-sm btn-ghost" id="btn-reset-unit" title="Reset this unit back to baseline vanilla stats">
+              🔄 Reset Unit
+            </button>
+          </div>
+        </div>
+
+        <!-- Sticky Quick Export Button in Inspector -->
+        <div class="inspector-export-bar">
+          <button class="btn btn-primary btn-block btn-lg" id="btn-quick-export">
+            🚀 Pack & Export Mod (<span class="export-units-count">0</span> units)
+          </button>
+        </div>
+      </div>
+
+      <!-- Tab Content 2: Mod Settings & Packaging -->
+      <div class="sidebar-card tab-content" id="tab-settings" style="display: none;">
+        <h2 class="sidebar-title">⚙️ Mod Packaging Settings</h2>
+
+        <!-- Mod Metadata -->
+        <div class="form-group">
+          <label for="input-mod-name">Mod Name</label>
+          <input type="text" id="input-mod-name" value="Player Custom Buffs" placeholder="e.g. T1 Land Rush Buff">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group half">
+            <label for="input-author">Author</label>
+            <input type="text" id="input-author" value="User" placeholder="Your name">
+          </div>
+          <div class="form-group half">
+            <label for="input-version">Version</label>
+            <input type="number" id="input-version" value="1" min="1" step="1">
+          </div>
+        </div>
+
+        <hr class="divider">
+
+        <!-- Target Scope -->
+        <div class="form-group">
+          <label class="section-label">Target Scope</label>
+          <div class="scope-options">
+            <label class="scope-radio-card active" id="card-scope-player">
+              <input type="radio" name="target-scope" value="player" checked>
+              <div class="scope-radio-content">
+                <div class="scope-radio-title">👑 Specific Player Only</div>
+                <div class="scope-radio-desc">Generates Sim Hook (<code>Unit.lua</code>). Only units owned by this player receive the modified stats!</div>
+              </div>
+            </label>
+
+            <label class="scope-radio-card" id="card-scope-global">
+              <input type="radio" name="target-scope" value="global">
+              <div class="scope-radio-content">
+                <div class="scope-radio-title">🌐 Global / All Players</div>
+                <div class="scope-radio-desc">Generates Blueprint Hook (<code>Blueprints.lua</code>). Changes stats for all players in the match.</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group" id="group-player-name">
+          <label for="input-player-name">Player Nickname (FAF In-Game Name)</label>
+          <input type="text" id="input-player-name" value="User" placeholder="Exact FAF lobby name">
+          <span class="field-hint">Must match your in-game username in the FAF lobby.</span>
+        </div>
+
+        <hr class="divider">
+
+        <!-- Export Action -->
+        <div class="export-section">
+          <button class="btn btn-primary btn-block btn-lg" id="btn-export">
+            🚀 Pack & Export Mod (<span class="export-units-count">0</span> units)
+          </button>
+        </div>
+
+        <div id="export-feedback" class="feedback-card" style="display: none;"></div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Notification Toast -->
+  <div id="toast" class="toast"></div>
+
+  <script src="/static/js/forge-store.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

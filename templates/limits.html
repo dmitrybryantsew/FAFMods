@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FAF Mod Forge - Player Unit Limits & Restrictions</title>
+  <link rel="stylesheet" href="/static/css/spooky.css">
+  <link rel="stylesheet" href="/static/css/app.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-left">
+      <div class="logo-mark">FAF</div>
+      <div>
+        <h1 class="logo-title">UNIT LIMITER</h1>
+        <p class="logo-subtitle">Restrict specific units or categories by player name</p>
+      </div>
+      <nav class="nav-links">
+        <a href="/" class="nav-link">⚡ Unit Stat Forge <span class="nav-badge" id="nav-count-buffs">0</span></a>
+        <a href="/limits" class="nav-link active limits">🛑 Unit Limiter <span class="nav-badge" id="nav-count-limits">0</span></a>
+        <a href="/popups" class="nav-link popups">📢 Event Popups <span class="nav-badge" id="nav-count-popups">0</span></a>
+        <a href="/relics" class="nav-link relics">💎 Relic Objectives <span class="nav-badge" id="nav-count-relics">0</span></a>
+        <a href="/lootbox" class="nav-link lootbox">🎰 Surprise Casino <span class="nav-badge" id="nav-count-lootbox">0</span></a>
+        <a href="/combined" class="nav-link combined">📦 Combined Mod <span class="nav-badge accent" id="nav-count-combined">0</span></a>
+      </nav>
+    </div>
+    <div class="header-right">
+      <div class="stats-badge">
+        <span class="badge-label">Active Limits:</span>
+        <span class="badge-val" id="total-limits-count">0</span>
+      </div>
+      <button class="btn btn-secondary" id="btn-open-folder" title="Open Supreme Commander Mods directory in File Explorer">
+        📁 Open Mods Folder
+      </button>
+    </div>
+  </header>
+
+  <div class="main-layout">
+    <!-- Left Column: Preset Limit Cards & Custom Unit Search -->
+    <main class="content-panel">
+      <!-- Section 1: Presets -->
+      <section class="filters-card">
+        <div class="limits-section-header">
+          <div>
+            <h2 class="limits-section-title">⚡ Quick Category Limits</h2>
+            <p class="limits-section-subtitle">Toggle common building & experimental limits with 1 click</p>
+          </div>
+          <div class="batch-actions">
+            <button class="btn btn-sm btn-outline" id="btn-enable-recommended">✓ Recommended Presets</button>
+            <button class="btn btn-sm btn-ghost" id="btn-disable-all-presets">Disable All</button>
+          </div>
+        </div>
+
+        <div class="preset-grid" id="preset-grid">
+          <!-- Populated by limits.js with T3 Mexes, Experimentals, Paragon, Nukes, etc. -->
+        </div>
+      </section>
+
+      <!-- Section 2: Custom Granular Unit Limiter -->
+      <section class="filters-card">
+        <div class="limits-section-header">
+          <div>
+            <h2 class="limits-section-title">🎯 Custom Unit Limiter</h2>
+            <p class="limits-section-subtitle">Search across 503 units to limit any individual unit (e.g. Fatboy, Mantis, Megalith)</p>
+          </div>
+          <div class="batch-actions">
+            <span id="filtered-units-text" style="font-size: 0.75rem; color: var(--text-muted);">503 units available</span>
+          </div>
+        </div>
+
+        <!-- Search & Filter Controls -->
+        <div class="filter-row search-row">
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="custom-search" placeholder="Search by name, ID, or description (e.g. Fatboy, UEL0401, Mantis, Novax, Salvation)...">
+            <button id="clear-custom-search" class="btn-clear" style="display: none;">✕</button>
+          </div>
+        </div>
+
+        <div class="filter-row filter-chips-row">
+          <div class="filter-group">
+            <span class="filter-group-title">Faction:</span>
+            <div class="chips-container" id="custom-faction-chips">
+              <button class="chip active" data-filter="faction" data-val="ALL">All</button>
+              <button class="chip uef" data-filter="faction" data-val="UEF">UEF</button>
+              <button class="chip cybran" data-filter="faction" data-val="Cybran">Cybran</button>
+              <button class="chip aeon" data-filter="faction" data-val="Aeon">Aeon</button>
+              <button class="chip seraphim" data-filter="faction" data-val="Seraphim">Seraphim</button>
+              <button class="chip nomads" data-filter="faction" data-val="Nomads">Nomads</button>
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <span class="filter-group-title">Tier:</span>
+            <div class="chips-container" id="custom-tech-chips">
+              <button class="chip active" data-filter="tech" data-val="ALL">All</button>
+              <button class="chip" data-filter="tech" data-val="T1">T1</button>
+              <button class="chip" data-filter="tech" data-val="T2">T2</button>
+              <button class="chip" data-filter="tech" data-val="T3">T3</button>
+              <button class="chip exp" data-filter="tech" data-val="EXP">EXP</button>
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <span class="filter-group-title">Type:</span>
+            <div class="chips-container" id="custom-type-chips">
+              <button class="chip active" data-filter="type" data-val="ALL">All</button>
+              <button class="chip" data-filter="type" data-val="LAND">Land</button>
+              <button class="chip" data-filter="type" data-val="AIR">Air</button>
+              <button class="chip" data-filter="type" data-val="NAVAL">Naval</button>
+              <button class="chip" data-filter="type" data-val="STRUCTURE">Structure</button>
+              <button class="chip" data-filter="type" data-val="DEFENSE">Defense</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mini Unit Grid for Adding Individual Limits -->
+        <div class="unit-grid" id="custom-unit-grid" style="max-height: 480px; overflow-y: auto; margin-top: 10px;">
+          <!-- Dynamically populated -->
+        </div>
+      </section>
+    </main>
+
+    <!-- Right Column: Settings & Active Limits Summary -->
+    <aside class="sidebar-panel">
+      <!-- Target Player & Mod Setup -->
+      <div class="sidebar-card">
+        <h2 class="sidebar-title">👑 Target & Mod Settings</h2>
+
+        <div class="form-group">
+          <label class="section-label">Target Scope</label>
+          <div class="scope-options">
+            <label class="scope-radio-card active" id="card-scope-player">
+              <input type="radio" name="target-scope" value="player" checked>
+              <div class="scope-radio-content">
+                <div class="scope-radio-title">👑 Specific Player Only</div>
+                <div class="scope-radio-desc">Limits apply exclusively to this player by in-game username.</div>
+              </div>
+            </label>
+
+            <label class="scope-radio-card" id="card-scope-global">
+              <input type="radio" name="target-scope" value="global">
+              <div class="scope-radio-content">
+                <div class="scope-radio-title">🌐 Global / All Players</div>
+                <div class="scope-radio-desc">Enforce limits across every player in the match.</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group" id="group-player-name">
+          <label for="input-player-name">Player Nickname (FAF In-Game Name)</label>
+          <input type="text" id="input-player-name" value="User" placeholder="Exact FAF lobby name">
+          <span class="field-hint">Must match the player's nickname in the FAF game lobby.</span>
+        </div>
+
+        <hr class="divider">
+
+        <div class="form-group">
+          <label for="input-mod-name">Mod Name</label>
+          <input type="text" id="input-mod-name" value="Player Unit Limits" placeholder="e.g. Anti-Spam Unit Limits">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group half">
+            <label for="input-author">Author</label>
+            <input type="text" id="input-author" value="User" placeholder="Your name">
+          </div>
+          <div class="form-group half">
+            <label for="input-version">Version</label>
+            <input type="number" id="input-version" value="1" min="1" step="1">
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Limits Card -->
+      <div class="sidebar-card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <h2 class="sidebar-title" style="margin-bottom: 0;">🛑 Active Limits (<span id="active-badge-count">0</span>)</h2>
+          <button class="btn btn-sm btn-ghost" id="btn-clear-all-rules" title="Remove all active limits">Clear All</button>
+        </div>
+
+        <div class="active-rules-container" id="active-rules-container">
+          <!-- Populated dynamically -->
+          <div class="rules-empty-box" id="rules-empty-state">
+            <span>No limits configured yet.<br>Enable presets or pick units to limit.</span>
+          </div>
+        </div>
+
+        <hr class="divider">
+
+        <!-- Export Action -->
+        <div class="export-section">
+          <button class="btn btn-primary btn-block btn-lg" id="btn-export-limits">
+            🚀 Pack & Export Limits Mod (<span id="btn-limits-count">0</span> rules)
+          </button>
+        </div>
+
+        <div id="export-feedback" class="feedback-card" style="display: none;"></div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Notification Toast -->
+  <div id="toast" class="toast"></div>
+
+  <script src="/static/js/forge-store.js"></script>
+  <script src="/static/js/limits.js"></script>
+</body>
+</html>

@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FAF Mod Forge - Surprise Casino & Lootbox Engine</title>
+  <link rel="stylesheet" href="/static/css/spooky.css">
+  <link rel="stylesheet" href="/static/css/app.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-left">
+      <div class="logo-mark">FAF</div>
+      <div>
+        <h1 class="logo-title">SURPRISE CASINO</h1>
+        <p class="logo-subtitle">Capturable lootbox vaults with in-game casino spin, drop tables & hostile civilian ambushes</p>
+      </div>
+      <nav class="nav-links">
+        <a href="/" class="nav-link">⚡ Unit Stat Forge <span class="nav-badge" id="nav-count-buffs">0</span></a>
+        <a href="/limits" class="nav-link limits">🛑 Unit Limiter <span class="nav-badge" id="nav-count-limits">0</span></a>
+        <a href="/popups" class="nav-link popups">📢 Event Popups <span class="nav-badge" id="nav-count-popups">0</span></a>
+        <a href="/relics" class="nav-link relics">💎 Relic Objectives <span class="nav-badge" id="nav-count-relics">0</span></a>
+        <a href="/lootbox" class="nav-link active lootbox">📦 Lootbox & Casino <span class="nav-badge" id="nav-count-lootbox">0</span></a>
+        <a href="/combined" class="nav-link combined">📦 Combined Mod <span class="nav-badge accent" id="nav-count-combined">0</span></a>
+      </nav>
+    </div>
+    <div class="header-right">
+      <div class="stats-badge" style="border-color: #ffd700;">
+        <span class="badge-label" style="color: #ffd700;">Total Drop Odds:</span>
+        <span class="badge-val" id="total-outcomes-count">0 Outcomes</span>
+      </div>
+      <button class="btn btn-secondary" id="btn-open-folder" title="Open Supreme Commander Mods directory in File Explorer">
+        📁 Open Mods Folder
+      </button>
+    </div>
+  </header>
+
+  <div class="main-layout">
+    <!-- Left Column: Casino Simulator, Presets, Settings & Drop Table -->
+    <main class="content-panel">
+      <!-- Section 1: Interactive In-Browser Slot Machine Simulator -->
+      <section class="casino-machine-card">
+        <div class="casino-header">
+          <div class="casino-title-wrap">
+            <span class="casino-icon">🎰</span>
+            <div>
+              <h2 class="casino-title">QUANTUM CASINO SIMULATOR</h2>
+              <p class="casino-subtitle">Interactive preview of the in-game slot machine mechanic and drop probabilities</p>
+            </div>
+          </div>
+          <div class="batch-actions">
+            <span class="rarity-badge rarity-jackpot" id="sim-status-badge">READY TO SPIN</span>
+          </div>
+        </div>
+
+        <div class="slot-machine-frame">
+          <div class="reels-container">
+            <div class="reel-box" id="reel-1">
+              <span class="reel-icon" id="reel-icon-1">🌟</span>
+              <span class="reel-label" id="reel-label-1">JACKPOT</span>
+            </div>
+            <div class="reel-box" id="reel-2">
+              <span class="reel-icon" id="reel-icon-2">🌟</span>
+              <span class="reel-label" id="reel-label-2">JACKPOT</span>
+            </div>
+            <div class="reel-box" id="reel-3">
+              <span class="reel-icon" id="reel-icon-3">🌟</span>
+              <span class="reel-label" id="reel-label-3">JACKPOT</span>
+            </div>
+          </div>
+
+          <div class="machine-controls">
+            <button class="btn-spin-lever" id="btn-sim-spin">
+              <span>🎰 PULL LEVER / TEST SPIN</span>
+            </button>
+          </div>
+
+          <div class="slot-result-banner" id="slot-result-banner">
+            <div class="slot-result-title" id="slot-result-title" style="color: #ffd700;">Click "PULL LEVER" to test your drop table!</div>
+            <div class="slot-result-desc" id="slot-result-desc">In-game, selecting your captured lootbox displays the Play ability and spins the reels.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 2: Quick Casino & Lootbox Presets -->
+      <section class="filters-card">
+        <div class="relic-section-header">
+          <div>
+            <h2 class="relic-section-title">⚡ Quick Spawn Presets</h2>
+            <p class="relic-section-subtitle">Load balanced high-stakes drops, tactical battle packs, or swarm pods with 1 click</p>
+          </div>
+          <div class="batch-actions" style="display: flex; flex-wrap: wrap; gap: 8px;">
+            <button class="btn btn-sm btn-outline" id="btn-preset-prototype" style="border-color: #38bdf8; color: #38bdf8;">🏆 Prototype Experimental (Capture & Run)</button>
+            <button class="btn btn-sm btn-outline" id="btn-preset-swarm" style="border-color: #34d399; color: #34d399;">🦖 Swarm Bio-Pod</button>
+            <button class="btn btn-sm btn-outline" id="btn-preset-supply" style="border-color: #60a5fa; color: #60a5fa;">📦 Tactical Vanguard Armor</button>
+            <button class="btn btn-sm btn-outline" id="btn-preset-motherlode" style="border-color: #f59e0b; color: #f59e0b;">💎 Resource Motherlode</button>
+            <button class="btn btn-sm btn-outline" id="btn-preset-highroller">🎰 High-Roller Casino</button>
+            <button class="btn btn-sm btn-outline" id="btn-preset-anarchy">💀 Mercenary Ambush</button>
+            <button class="btn btn-sm btn-ghost" id="btn-reset-default">Reset Default</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 3: Lootbox Vault Spawning & In-Game Rules -->
+      <section class="filters-card">
+        <div class="relic-section-header">
+          <div>
+            <h2 class="relic-section-title">📦 Battlefield Vault Spawning & Capture Rules</h2>
+            <p class="relic-section-subtitle">Configure 3D model, map spawn points, capture requirements, spin costs, and cooldowns</p>
+          </div>
+        </div>
+
+        <div class="builder-step-card">
+          <div class="builder-step-title">
+            <span class="builder-step-num">1</span>
+            <span>Vault Entity Identity & Model</span>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group half">
+              <label for="lootbox-name">Vault Display Name</label>
+              <input type="text" id="lootbox-name" value="Quantum Surprise Vault" placeholder="e.g. Galactic Casino Vault">
+            </div>
+            <div class="form-group half">
+              <label for="lootbox-model">3D Structure Blueprint</label>
+              <select id="lootbox-model" class="custom-select">
+                <option value="uec1904" selected>UEF Communication Tower (uec1904)</option>
+                <option value="uac1902">Aeon Ancient Network Node (uac1902)</option>
+                <option value="urc1902">Cybran Quantum Spire (urc1902)</option>
+                <option value="uec1401">High-Tech Civilian Bunker (uec1401)</option>
+                <option value="uec0001">Civilian Supply Vehicle (uec0001)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group third">
+              <label for="lootbox-spawn-delay">Spawn Delay (Seconds)</label>
+              <input type="number" id="lootbox-spawn-delay" value="30" min="0" max="1800" step="5">
+              <span class="field-hint">Time before vaults appear on map</span>
+            </div>
+            <div class="form-group third">
+              <label for="lootbox-spawn-count">Spawn Count</label>
+              <input type="number" id="lootbox-spawn-count" value="2" min="1" max="8" step="1">
+              <span class="field-hint">Total vaults placed in match</span>
+            </div>
+            <div class="form-group third">
+              <label for="lootbox-loc-mode">Spawn Location</label>
+              <select id="lootbox-loc-mode" class="custom-select">
+                <option value="center" selected>Map Center</option>
+                <option value="random_center">Scattered Around Center (Radius 40-90)</option>
+                <option value="coords">Custom Coordinates (X / Z)</option>
+                <option value="observer_only">Observer GM Placement Only (In-Game Placement by DrReed)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row" id="group-custom-coords" style="display: none;">
+            <div class="form-group half">
+              <label for="lootbox-custom-x">Custom X Coordinate</label>
+              <input type="number" id="lootbox-custom-x" value="256" min="0" max="2048">
+            </div>
+            <div class="form-group half">
+              <label for="lootbox-custom-z">Custom Z Coordinate</label>
+              <input type="number" id="lootbox-custom-z" value="256" min="0" max="2048">
+            </div>
+          </div>
+        </div>
+
+        <div class="builder-step-card">
+          <div class="builder-step-title">
+            <span class="builder-step-num">2</span>
+            <span>Capture & Loot Delivery Rules</span>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group half">
+              <label for="lootbox-open-mode">Opening & Loot Delivery Mode</label>
+              <select id="lootbox-open-mode" class="custom-select" style="border-color: #ffd700; color: #ffd700;">
+                <option value="instant_crack" selected>⚡ Capture & Run (Instant Crack-Open - Loot dropped immediately!)</option>
+                <option value="interactive">🎰 Contested Interactive Casino (Claim to own, then pull lever)</option>
+              </select>
+              <span class="field-hint">Capture & Run automatically cracks open the vault upon capture so players take the prize and push!</span>
+            </div>
+
+            <div class="form-group half">
+              <label for="lootbox-claim-mode">How Vault is Claimed</label>
+              <select id="lootbox-claim-mode" class="custom-select">
+                <option value="both" selected>Both (Engineer Capture Beam + Proximity Walk-over)</option>
+                <option value="capture">Engineer / ACU Capture Beam Only</option>
+                <option value="proximity">Combat Unit / Walk-over Proximity Only</option>
+              </select>
+              <span class="field-hint">Defines how players contest and seize the lootbox</span>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group half">
+              <label for="lootbox-respawn-mode">Usage / Lifecycle Mode</label>
+              <select id="lootbox-respawn-mode" class="custom-select">
+                <option value="single_use" selected>Single-Use (Consumes vault with fireworks on prize payout)</option>
+                <option value="reusable">Reusable (Cooldown between spins/drops)</option>
+              </select>
+              <span class="field-hint">Single-use is ideal for Capture & Run; reusable turns the spot into a persistent objective</span>
+            </div>
+
+            <div class="form-group half">
+              <label for="lootbox-cooldown">Spin / Re-arm Cooldown (Seconds)</label>
+              <input type="number" id="lootbox-cooldown" value="60" min="5" max="600" step="5">
+              <span class="field-hint">Cooldown before vault can be used again if reusable</span>
+            </div>
+          </div>
+
+          <div class="form-row" id="row-casino-costs">
+            <div class="form-group half">
+              <label for="lootbox-cost-energy">Spin Cost: Energy (Casino Mode)</label>
+              <input type="number" id="lootbox-cost-energy" value="500" min="0" max="100000" step="100">
+              <span class="field-hint">Energy deducted to spin in casino mode (0 for free)</span>
+            </div>
+            <div class="form-group half">
+              <label for="lootbox-cost-mass">Spin Cost: Mass (Casino Mode)</label>
+              <input type="number" id="lootbox-cost-mass" value="0" min="0" max="10000" step="50">
+              <span class="field-hint">Mass deducted to spin (0 for free)</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="builder-step-card" style="border-color: #38bdf8;">
+          <div class="builder-step-title" style="color: #38bdf8;">
+            <span class="builder-step-num" style="background: #38bdf8;">3</span>
+            <span>Observer Game Master (DrReed) In-Game Controls</span>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group half">
+              <label for="observer-gm-name">Authorized Observer GM Nickname</label>
+              <input type="text" id="observer-gm-name" value="DrReed" placeholder="e.g. DrReed, or 'all'">
+              <span class="field-hint">Client must be an observer and match this nickname to access GM tools (or 'all' for any observer)</span>
+            </div>
+            <div class="form-group half">
+              <label for="observer-gm-placement">Observer In-Game Placement Tool</label>
+              <div style="display: flex; align-items: center; gap: 10px; margin-top: 10px;">
+                <input type="checkbox" id="observer-gm-placement" checked style="width: 20px; height: 20px; accent-color: #38bdf8;">
+                <span style="font-size: 13px; color: #cbd5e1;">Allow DrReed to spawn seeded lootboxes at cursor live in-game</span>
+              </div>
+              <span class="field-hint">Adds an in-game HUD tool for the observer to drop preset crates anywhere on the map!</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 4: Drop Table Entries & Odds -->
+      <section class="filters-card">
+        <div class="relic-section-header">
+          <div>
+            <h2 class="relic-section-title">🎲 Active Drop Table (<span id="drop-items-count">7</span> Entries)</h2>
+            <p class="relic-section-subtitle">Units, structures, resource jackpots, bankruptcy drains, and hostile civilian mercenary ambushes</p>
+          </div>
+          <button class="btn btn-sm btn-primary" id="btn-toggle-add-drop">➕ Add Custom Drop</button>
+        </div>
+
+        <!-- Add Custom Drop Modal / Drawer -->
+        <div class="builder-step-card" id="form-add-drop" style="display: none; border-color: #ffd700;">
+          <div class="builder-step-title" style="color: #ffd700;">
+            <span>✨ Add Custom Outcome to Drop Table</span>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group half">
+              <label for="drop-name">Outcome Display Name</label>
+              <input type="text" id="drop-name" placeholder="e.g. Rogue Colossus Ambush, Energy Vault">
+            </div>
+            <div class="form-group half">
+              <label for="drop-type">Outcome Mechanic Type</label>
+              <select id="drop-type" class="custom-select">
+                <option value="spawn_unit" selected>🤖 Spawn Friendly Unit</option>
+                <option value="spawn_structure">🏰 Spawn Friendly Structure</option>
+                <option value="spawn_hostile">💀 Spawn Hostile Civilian / Rogue Enemy (Ambush!)</option>
+                <option value="give_resources">💰 Give Resources (+Mass / +Energy Jackpot)</option>
+                <option value="take_resources">💸 Take Resources (Syndicate Heist / Drain)</option>
+                <option value="explosion_trap">💥 Booby Trap Shockwave Explosion</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row" id="row-unit-config">
+            <div class="form-group half">
+              <label for="drop-unit-id">Unit / Structure Blueprint ID</label>
+              <input type="text" id="drop-unit-id" value="uel0401" placeholder="e.g. uel0401, url0303, ueb2301">
+              <span class="field-hint">Any valid FAF unit blueprint ID</span>
+            </div>
+            <div class="form-group half">
+              <label for="drop-unit-count">Spawn Count</label>
+              <input type="number" id="drop-unit-count" value="1" min="1" max="20" step="1">
+            </div>
+          </div>
+
+          <div class="form-row" id="row-resource-config" style="display: none;">
+            <div class="form-group half">
+              <label for="drop-mass">Mass Amount</label>
+              <input type="number" id="drop-mass" value="5000" min="0" step="500">
+            </div>
+            <div class="form-group half">
+              <label for="drop-energy">Energy Amount</label>
+              <input type="number" id="drop-energy" value="50000" min="0" step="5000">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group third">
+              <label for="drop-rarity">Rarity Category</label>
+              <select id="drop-rarity" class="custom-select">
+                <option value="jackpot">🌟 Jackpot (Grand Prize)</option>
+                <option value="rare" selected>💎 Rare (High Value)</option>
+                <option value="common">🪙 Common (Standard)</option>
+                <option value="unlucky">💸 Unlucky (Resource Drain)</option>
+                <option value="disaster">💀 Disaster (Hostile Ambush)</option>
+              </select>
+            </div>
+            <div class="form-group third">
+              <label for="drop-weight">Pool Weight (Relative Odds)</label>
+              <input type="number" id="drop-weight" value="100" min="1" max="1000" step="10">
+              <span class="field-hint">Higher weight = higher spin probability</span>
+            </div>
+            <div class="form-group third">
+              <label for="drop-reels">Reel Icon Symbol</label>
+              <input type="text" id="drop-reels" value="💎" maxlength="4">
+              <span class="field-hint">Emoji symbol shown on slot reel</span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="drop-desc">Outcome Alert Description</label>
+            <input type="text" id="drop-desc" placeholder="Notification message announced when rolled">
+          </div>
+
+          <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 10px;">
+            <button class="btn btn-sm btn-ghost" id="btn-cancel-add-drop">Cancel</button>
+            <button class="btn btn-sm btn-primary" id="btn-save-custom-drop">Add to Drop Table</button>
+          </div>
+        </div>
+
+        <!-- Rendered list of drop table entries -->
+        <div class="drop-table-grid" id="drop-table-container">
+          <!-- Populated by lootbox.js -->
+        </div>
+      </section>
+    </main>
+
+    <!-- Right Column: Sidebar & Export Mod -->
+    <aside class="sidebar-panel">
+      <!-- Target Scope Card -->
+      <div class="sidebar-card">
+        <h2 class="sidebar-title">🎯 Target Scope</h2>
+        <div class="form-group">
+          <label>Scope Mode</label>
+          <div class="radio-group vertical">
+            <label class="radio-label">
+              <input type="radio" name="scope-mode" value="player" checked>
+              <span>Specific Player (Sim Hook)</span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="scope-mode" value="global">
+              <span>Global (All Players)</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group" id="group-player-name">
+          <label for="input-player-name">Player Nickname (FAF In-Game Name)</label>
+          <input type="text" id="input-player-name" value="Taily" placeholder="Exact FAF lobby name">
+          <span class="field-hint">Must match the player's nickname in the FAF lobby.</span>
+        </div>
+
+        <hr class="divider">
+
+        <div class="form-group">
+          <label for="input-mod-name">Mod Name</label>
+          <input type="text" id="input-mod-name" value="Surprise Casino Lootbox" placeholder="e.g. Surprise Casino Lootbox">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group half">
+            <label for="input-author">Author</label>
+            <input type="text" id="input-author" value="User" placeholder="Your name">
+          </div>
+          <div class="form-group half">
+            <label for="input-version">Version</label>
+            <input type="number" id="input-version" value="1" min="1" step="1">
+          </div>
+        </div>
+      </div>
+
+      <!-- Drop Table Summary Card -->
+      <div class="sidebar-card">
+        <h2 class="sidebar-title" style="margin-bottom: 0;">📊 Odds Breakdown</h2>
+        <div class="active-rules-container" id="odds-breakdown-container" style="max-height: 280px; margin-top: 12px;">
+          <!-- Populated dynamically -->
+        </div>
+
+        <hr class="divider">
+
+        <!-- Export Action -->
+        <div class="export-section">
+          <button class="btn btn-primary btn-block btn-lg" id="btn-export-lootbox" style="background: linear-gradient(135deg, #f59e0b 0%, #7c3aed 100%);">
+            🚀 Pack & Export Casino Mod
+          </button>
+        </div>
+
+        <div id="export-feedback" class="feedback-card" style="display: none;"></div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Notification Toast -->
+  <div id="toast" class="toast"></div>
+
+  <script src="/static/js/forge-store.js"></script>
+  <script src="/static/js/lootbox.js"></script>
+</body>
+</html>

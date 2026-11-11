@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FAF Mod Forge - Relic & Crate Objectives</title>
+  <link rel="stylesheet" href="/static/css/spooky.css">
+  <link rel="stylesheet" href="/static/css/app.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-left">
+      <div class="logo-mark">FAF</div>
+      <div>
+        <h1 class="logo-title">RELIC FORGE</h1>
+        <p class="logo-subtitle">Spawn capturable relics or crates that reward commanders with unit buffs</p>
+      </div>
+      <nav class="nav-links">
+        <a href="/" class="nav-link">⚡ Unit Stat Forge <span class="nav-badge" id="nav-count-buffs">0</span></a>
+        <a href="/limits" class="nav-link limits">🛑 Unit Limiter <span class="nav-badge" id="nav-count-limits">0</span></a>
+        <a href="/popups" class="nav-link popups">📢 Event Popups <span class="nav-badge" id="nav-count-popups">0</span></a>
+        <a href="/relics" class="nav-link active relics">💎 Relic Objectives <span class="nav-badge" id="nav-count-relics">0</span></a>
+        <a href="/lootbox" class="nav-link lootbox">🎰 Surprise Casino <span class="nav-badge" id="nav-count-lootbox">0</span></a>
+        <a href="/combined" class="nav-link combined">📦 Combined Mod <span class="nav-badge accent" id="nav-count-combined">0</span></a>
+      </nav>
+    </div>
+    <div class="header-right">
+      <div class="stats-badge">
+        <span class="badge-label">Active Objectives:</span>
+        <span class="badge-val" id="total-objectives-count">0</span>
+      </div>
+      <button class="btn btn-secondary" id="btn-open-folder" title="Open Supreme Commander Mods directory in File Explorer">
+        📁 Open Mods Folder
+      </button>
+    </div>
+  </header>
+
+  <div class="main-layout">
+    <!-- Left Column: Presets & Custom Objective Builder -->
+    <main class="content-panel">
+      <!-- Section 1: Presets -->
+      <section class="filters-card">
+        <div class="relic-section-header">
+          <div>
+            <h2 class="relic-section-title">⚡ Quick Relic Presets</h2>
+            <p class="relic-section-subtitle">Add ready-to-play battlefield objectives with balanced buffs with 1 click</p>
+          </div>
+          <div class="batch-actions">
+            <button class="btn btn-sm btn-outline" id="btn-add-all-presets">✓ Add All 4 Presets</button>
+            <button class="btn btn-sm btn-ghost" id="btn-clear-presets">Clear Objectives</button>
+          </div>
+        </div>
+
+        <div class="relic-preset-grid" id="relic-preset-grid">
+          <!-- Populated by relics.js with Center Beacon, Ancient Relic, Quantum Core, Supply Depot -->
+        </div>
+      </section>
+
+      <!-- Section 2: Custom Objective Builder -->
+      <section class="filters-card">
+        <div class="relic-section-header">
+          <div>
+            <h2 class="relic-section-title">🛠️ Custom Objective Builder</h2>
+            <p class="relic-section-subtitle">Configure object model, spawn location, commander claim trigger, and custom unit buffs</p>
+          </div>
+        </div>
+
+        <!-- Step 1: Objective Identity & Visual Model -->
+        <div class="builder-step-card">
+          <div class="builder-step-title">
+            <span class="builder-step-num">1</span>
+            <span>Objective Identity & Visual Model</span>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group half">
+              <label for="obj-name">Objective Display Name</label>
+              <input type="text" id="obj-name" value="Ancient Alien Beacon" placeholder="e.g. Center Relic, Quantum Cache">
+            </div>
+
+            <div class="form-group half">
+              <label for="obj-model-select">Object Blueprint / Model</label>
+                <option value="uec1904" selected>🗼 Communication Relay Tower (uec1904)</option>
+                <option value="uac1902">🏛️ Ancient Aeon Network Node (uac1902)</option>
+                <option value="urc1902">⚡ Cybran Network Spire Node (urc1902)</option>
+                <option value="xsc1902">✨ Seraphim Temple Monolith (xsc1902)</option>
+                <option value="ueb3101">🛰️ Radar Array Station (ueb3101)</option>
+                <option value="uec0001">🚚 Civilian Supply Truck (uec0001)</option>
+                <option value="UEB1101">🔋 T1 Power Relic (UEB1101)</option>
+                <option value="custom">✏️ Custom Blueprint ID...</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group" id="group-custom-blueprint" style="display: none; margin-top: 8px;">
+            <label for="obj-custom-bp">Custom Blueprint ID (from game files or units)</label>
+            <input type="text" id="obj-custom-bp" placeholder="e.g. uec1901 or UEL0106">
+          </div>
+        </div>
+
+        <!-- Step 2: Spawning & Location -->
+        <div class="builder-step-card">
+          <div class="builder-step-title">
+            <span class="builder-step-num">2</span>
+            <span>Spawning Timing & Location</span>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group half">
+              <label for="obj-timing">Spawn Timing</label>
+              <select id="obj-timing" class="form-control" style="background: #090d15; border: 1px solid var(--border-color); color: var(--text-main); padding: 8px 12px; border-radius: 6px; width: 100%;">
+                <option value="0">⚡ Immediate (At Match Start, 0s)</option>
+                <option value="60">⏳ 1 Minute into match (60s)</option>
+                <option value="120">⏳ 2 Minutes into match (120s)</option>
+                <option value="300">⏳ 5 Minutes into match (300s)</option>
+                <option value="600">⏳ 10 Minutes into match (600s)</option>
+              </select>
+            </div>
+
+            <div class="form-group half">
+              <label for="obj-location-mode">Spawn Location</label>
+              <select id="obj-location-mode" class="form-control" style="background: #090d15; border: 1px solid var(--border-color); color: var(--text-main); padding: 8px 12px; border-radius: 6px; width: 100%;">
+                <option value="center">🎯 Map Center (Auto-calculated for any map)</option>
+                <option value="random_center">🎲 Random near Center (40–90 distance)</option>
+                <option value="coords">📍 Custom Coordinates (X, Z)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row" id="group-custom-coords" style="display: none; margin-top: 8px;">
+            <div class="form-group half">
+              <label for="obj-coord-x">Coordinate X</label>
+              <input type="number" id="obj-coord-x" value="256" step="10">
+            </div>
+            <div class="form-group half">
+              <label for="obj-coord-z">Coordinate Z</label>
+              <input type="number" id="obj-coord-z" value="256" step="10">
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3: Claim Trigger & Interaction -->
+        <div class="builder-step-card">
+          <div class="builder-step-title">
+            <span class="builder-step-num">3</span>
+            <span>Collection & Capture Rules</span>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group half">
+              <label for="obj-trigger-type">Interaction Method</label>
+              <select id="obj-trigger-type" class="form-control" style="background: #090d15; border: 1px solid var(--border-color); color: var(--text-main); padding: 8px 12px; border-radius: 6px; width: 100%;">
+                <option value="capture">📡 Capture Beam (Engineer/Commander captures structure)</option>
+                <option value="walkover">🚶 Proximity Pickup (Walk/Drive near the crate)</option>
+                <option value="both" selected>⚡ Either (Capture beam or walk over)</option>
+              </select>
+            </div>
+
+            <div class="form-group half">
+              <label for="obj-claimer">Who Can Claim</label>
+              <select id="obj-claimer" class="form-control" style="background: #090d15; border: 1px solid var(--border-color); color: var(--text-main); padding: 8px 12px; border-radius: 6px; width: 100%;">
+                <option value="commander" selected>👑 Commander Only (ACU)</option>
+                <option value="subcommander">🎖️ Commander or Support Commander (sACU)</option>
+                <option value="any">👥 Any Unit (Combat unit, Engineer, ACU)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group" id="group-pickup-radius" style="margin-top: 6px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <label for="obj-pickup-radius" style="margin-bottom: 0;">Proximity Pickup Radius</label>
+              <span id="radius-val" style="font-family: 'Chakra Petch', monospace; color: var(--accent-cyan); font-weight: 700;">6 O-Grid units</span>
+            </div>
+            <input type="range" id="obj-pickup-radius" min="3" max="20" value="6" step="1" style="width: 100%; accent-color: var(--accent-cyan);">
+          </div>
+        </div>
+
+        <!-- Step 4: Target Unit to Buff -->
+        <div class="builder-step-card">
+          <div class="builder-step-title">
+            <span class="builder-step-num">4</span>
+            <span>Target Unit to Receive Bonuses</span>
+          </div>
+
+          <!-- Current Selected Target Display -->
+          <div class="target-preview-box" id="target-preview-box">
+            <div class="target-preview-left">
+              <div class="target-preview-icon" id="preview-icon">🎖️</div>
+              <div>
+                <div class="target-preview-name" id="preview-name">Commander (ACU)</div>
+                <div class="target-preview-meta" id="preview-meta">Categories: COMMAND | Faction: Any</div>
+              </div>
+            </div>
+            <button class="btn btn-sm btn-outline" id="btn-choose-unit-toggle">Change Target Unit</button>
+          </div>
+
+          <!-- Unit Selector Panel (collapsible or toggleable) -->
+          <div id="unit-selector-panel" style="display: none; background: #080c14; border: 1px solid var(--border-color); border-radius: 6px; padding: 12px; margin-top: 10px;">
+            <div class="filter-row search-row" style="margin-bottom: 10px;">
+              <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="target-unit-search" placeholder="Search across 503 units (e.g. Mantis, Striker, Fatboy, Megalith, ACU)...">
+                <button id="clear-target-search" class="btn-clear" style="display: none;">✕</button>
+              </div>
+            </div>
+
+            <!-- Quick Category Target Buttons -->
+            <div style="margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
+              <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600;">Or Pick Category:</span>
+              <button class="chip active category-chip" data-cat="categories.COMMAND" data-name="Commander (ACU)">👑 Commander (ACU)</button>
+              <button class="chip category-chip" data-cat="categories.LAND * categories.TECH1 * (categories.DIRECTFIRE + categories.INDIRECTFIRE + categories.ANTIAIR)" data-name="All T1 Combat Units (Tanks, Arty, AA)">🛡️ All T1 Combat (Tanks/Arty/AA)</button>
+              <button class="chip category-chip" data-cat="categories.EXPERIMENTAL" data-name="All Experimentals (T4)">🚀 All Experimentals</button>
+              <button class="chip category-chip" data-cat="categories.LAND * categories.TECH1" data-name="All T1 Land Units">🚜 All T1 Land</button>
+              <button class="chip category-chip" data-cat="categories.LAND * categories.TECH3" data-name="All T3 Land Units">⚔️ All T3 Land</button>
+              <button class="chip category-chip" data-cat="categories.AIR" data-name="All Air Units">✈️ All Air</button>
+              <button class="chip category-chip" data-cat="categories.ARTILLERY" data-name="All Artillery">🎯 All Artillery</button>
+            </div>
+
+            <!-- Filters -->
+            <div class="filter-row filter-chips-row">
+              <div class="filter-group">
+                <span class="filter-group-title">Faction:</span>
+                <div class="chips-container" id="target-faction-chips">
+                  <button class="chip active" data-filter="faction" data-val="ALL">All</button>
+                  <button class="chip uef" data-filter="faction" data-val="UEF">UEF</button>
+                  <button class="chip cybran" data-filter="faction" data-val="Cybran">Cybran</button>
+                  <button class="chip aeon" data-filter="faction" data-val="Aeon">Aeon</button>
+                  <button class="chip seraphim" data-filter="faction" data-val="Seraphim">Seraphim</button>
+                  <button class="chip nomads" data-filter="faction" data-val="Nomads">Nomads</button>
+                </div>
+              </div>
+
+              <div class="filter-group">
+                <span class="filter-group-title">Tier:</span>
+                <div class="chips-container" id="target-tech-chips">
+                  <button class="chip active" data-filter="tech" data-val="ALL">All</button>
+                  <button class="chip" data-filter="tech" data-val="T1">T1</button>
+                  <button class="chip" data-filter="tech" data-val="T2">T2</button>
+                  <button class="chip" data-filter="tech" data-val="T3">T3</button>
+                  <button class="chip exp" data-filter="tech" data-val="EXP">EXP</button>
+                </div>
+              </div>
+
+              <div class="filter-group">
+                <span class="filter-group-title">Type:</span>
+                <div class="chips-container" id="target-type-chips">
+                  <button class="chip active" data-filter="type" data-val="ALL">All</button>
+                  <button class="chip" data-filter="type" data-val="LAND">Land</button>
+                  <button class="chip" data-filter="type" data-val="AIR">Air</button>
+                  <button class="chip" data-filter="type" data-val="NAVAL">Naval</button>
+                  <button class="chip" data-filter="type" data-val="STRUCTURE">Structure</button>
+                  <button class="chip" data-filter="type" data-val="DEFENSE">Defense</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Mini Unit Grid -->
+            <div class="unit-grid" id="target-unit-grid" style="max-height: 340px; overflow-y: auto; margin-top: 10px;">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 5: Buff Modifiers -->
+        <div class="builder-step-card">
+          <div class="builder-step-title">
+            <span class="builder-step-num">5</span>
+            <span>Buff Modifiers for Target Unit</span>
+          </div>
+
+          <div class="buff-sliders-grid">
+            <!-- Health Multiplier -->
+            <div class="buff-slider-item">
+              <div class="buff-slider-header">
+                <span class="buff-slider-label">❤️ Health Multiplier</span>
+                <span class="buff-slider-value" id="val-hp" style="color: #48cae4;">1.50x (+50%)</span>
+              </div>
+              <input type="range" id="slider-hp" class="buff-slider-input" min="1.0" max="4.0" step="0.05" value="1.50">
+            </div>
+
+            <!-- Weapon Range Multiplier -->
+            <div class="buff-slider-item">
+              <div class="buff-slider-header">
+                <span class="buff-slider-label">🎯 Weapon Range Multiplier</span>
+                <span class="buff-slider-value" id="val-range" style="color: #90e0ef;">1.30x (+30%)</span>
+              </div>
+              <input type="range" id="slider-range" class="buff-slider-input" min="1.0" max="3.0" step="0.05" value="1.30">
+            </div>
+
+            <!-- Weapon Damage Multiplier -->
+            <div class="buff-slider-item">
+              <div class="buff-slider-header">
+                <span class="buff-slider-label">💥 Weapon Damage Multiplier</span>
+                <span class="buff-slider-value" id="val-damage" style="color: #ff6b6b;">1.40x (+40%)</span>
+              </div>
+              <input type="range" id="slider-damage" class="buff-slider-input" min="1.0" max="4.0" step="0.05" value="1.40">
+            </div>
+
+            <!-- Movement Speed Multiplier -->
+            <div class="buff-slider-item">
+              <div class="buff-slider-header">
+                <span class="buff-slider-label">⚡ Movement Speed Multiplier</span>
+                <span class="buff-slider-value" id="val-speed" style="color: #ffb703;">1.20x (+20%)</span>
+              </div>
+              <input type="range" id="slider-speed" class="buff-slider-input" min="1.0" max="2.5" step="0.05" value="1.20">
+            </div>
+
+            <!-- Shield Multiplier -->
+            <div class="buff-slider-item">
+              <div class="buff-slider-header">
+                <span class="buff-slider-label">🛡️ Shield Max Health</span>
+                <span class="buff-slider-value" id="val-shield" style="color: #c77dff;">1.00x (Default)</span>
+              </div>
+              <input type="range" id="slider-shield" class="buff-slider-input" min="1.0" max="3.0" step="0.05" value="1.00">
+            </div>
+
+            <!-- Health Regen Multiplier -->
+            <div class="buff-slider-item">
+              <div class="buff-slider-header">
+                <span class="buff-slider-label">🩹 Health Regeneration</span>
+                <span class="buff-slider-value" id="val-regen" style="color: #00d2ff;">1.50x (+50%)</span>
+              </div>
+              <input type="range" id="slider-regen" class="buff-slider-input" min="1.0" max="5.0" step="0.1" value="1.50">
+            </div>
+
+            <!-- Buff Duration (Temporal Mode) -->
+            <div class="buff-slider-item" style="grid-column: 1 / -1; margin-top: 6px; padding: 12px; background: rgba(0, 210, 255, 0.05); border: 1px solid rgba(0, 210, 255, 0.25); border-radius: 8px;">
+              <div class="buff-slider-header">
+                <span class="buff-slider-label">⏳ Buff Duration (Temporal Mode)</span>
+                <span class="buff-slider-value" id="val-duration" style="color: #00d2ff; font-weight: 700;">♾️ Permanent (Until Match End)</span>
+              </div>
+              <div style="display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap;">
+                <button type="button" class="chip active duration-chip" data-sec="0">♾️ Permanent</button>
+                <button type="button" class="chip duration-chip" data-sec="45">⏱️ 45 Seconds</button>
+                <button type="button" class="chip duration-chip" data-sec="60">⏱️ 60s (1 Min)</button>
+                <button type="button" class="chip duration-chip" data-sec="120">⏱️ 120s (2 Min)</button>
+                <button type="button" class="chip duration-chip" data-sec="300">⏱️ 300s (5 Min)</button>
+              </div>
+              <input type="hidden" id="input-buff-duration" value="0">
+              <span class="field-hint" style="margin-top: 6px; display: block; color: var(--text-dim); font-size: 0.72rem;">
+                0 = Permanent. If set > 0, buffs temporarily apply to your army and expire cleanly after the duration, smoothly reverting all unit stats to base!
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 14px; text-align: right;">
+          <button class="btn btn-primary btn-lg" id="btn-add-objective" style="min-width: 260px;">
+            ➕ Add Objective to Mod
+          </button>
+        </div>
+      </section>
+    </main>
+
+    <!-- Right Column: Settings & Active Objectives Summary -->
+    <aside class="sidebar-panel">
+      <!-- Target Player & Scope Setup -->
+      <div class="sidebar-card">
+        <h2 class="sidebar-title">👑 Target & Mod Settings</h2>
+
+        <div class="form-group">
+          <label class="section-label">Claimer Scope</label>
+          <div class="scope-options">
+            <label class="scope-radio-card active" id="card-scope-global">
+              <input type="radio" name="target-scope" value="global" checked>
+              <div class="scope-radio-content">
+                <div class="scope-radio-title">🌐 Any Player (Contested)</div>
+                <div class="scope-radio-desc">Whoever captures/collects the objective claims the bonuses for their army.</div>
+              </div>
+            </label>
+
+            <label class="scope-radio-card" id="card-scope-player">
+              <input type="radio" name="target-scope" value="player">
+              <div class="scope-radio-content">
+                <div class="scope-radio-title">👑 Specific Player Only</div>
+                <div class="scope-radio-desc">Only the designated player's commander can unlock and receive the rewards.</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group" id="group-player-name" style="display: none;">
+          <label for="input-player-name">Player Nickname (FAF In-Game Name)</label>
+          <input type="text" id="input-player-name" value="User" placeholder="Exact FAF lobby name">
+          <span class="field-hint">Must match the player's nickname in the FAF lobby.</span>
+        </div>
+
+        <hr class="divider">
+
+        <div class="form-group">
+          <label for="input-mod-name">Mod Name</label>
+          <input type="text" id="input-mod-name" value="Commander Relic Objectives" placeholder="e.g. Commander Crate Buffs">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group half">
+            <label for="input-author">Author</label>
+            <input type="text" id="input-author" value="User" placeholder="Your name">
+          </div>
+          <div class="form-group half">
+            <label for="input-version">Version</label>
+            <input type="number" id="input-version" value="1" min="1" step="1">
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Objectives Card -->
+      <div class="sidebar-card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <h2 class="sidebar-title" style="margin-bottom: 0;">💎 Active Objectives (<span id="active-badge-count">0</span>)</h2>
+          <button class="btn btn-sm btn-ghost" id="btn-clear-all-objectives" title="Remove all objectives">Clear All</button>
+        </div>
+
+        <div class="active-rules-container" id="active-objectives-container" style="max-height: 420px;">
+          <!-- Populated dynamically -->
+          <div class="rules-empty-box" id="objectives-empty-state">
+            <span>No objectives configured yet.<br>Click a quick preset or add one above.</span>
+          </div>
+        </div>
+
+        <hr class="divider">
+
+        <!-- Export Action -->
+        <div class="export-section">
+          <button class="btn btn-primary btn-block btn-lg" id="btn-export-relics">
+            🚀 Pack & Export Relic Mod (<span id="btn-relics-count">0</span> objectives)
+          </button>
+        </div>
+
+        <div id="export-feedback" class="feedback-card" style="display: none;"></div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Notification Toast -->
+  <div id="toast" class="toast"></div>
+
+  <script src="/static/js/forge-store.js"></script>
+  <script src="/static/js/relics.js"></script>
+</body>
+</html>

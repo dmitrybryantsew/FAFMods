@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FAF Mod Forge - Combined Master Mod Packager</title>
+  <link rel="stylesheet" href="/static/css/spooky.css">
+  <link rel="stylesheet" href="/static/css/app.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-left">
+      <div class="logo-mark">FAF</div>
+      <div>
+        <h1 class="logo-title">COMBINED MOD</h1>
+        <p class="logo-subtitle">Combine unit buffs, build limits, event popups & relics into 1 unified mod</p>
+      </div>
+      <nav class="nav-links">
+        <a href="/" class="nav-link">⚡ Unit Stat Forge <span class="nav-badge" id="nav-count-buffs">0</span></a>
+        <a href="/limits" class="nav-link limits">🛑 Unit Limiter <span class="nav-badge" id="nav-count-limits">0</span></a>
+        <a href="/popups" class="nav-link popups">📢 Event Popups <span class="nav-badge" id="nav-count-popups">0</span></a>
+        <a href="/relics" class="nav-link relics">💎 Relic Objectives <span class="nav-badge" id="nav-count-relics">0</span></a>
+        <a href="/lootbox" class="nav-link lootbox">📦 Lootbox & Casino <span class="nav-badge" id="nav-count-lootbox">0</span></a>
+        <a href="/combined" class="nav-link active combined">📦 Combined Mod <span class="nav-badge accent" id="nav-count-combined">0</span></a>
+      </nav>
+    </div>
+    <div class="header-right">
+      <div class="stats-badge accent">
+        <span class="badge-label">Total Rules:</span>
+        <span class="badge-val" id="total-combined-count">0</span>
+      </div>
+      <button class="btn btn-secondary" id="btn-open-folder" title="Open Supreme Commander Mods directory in File Explorer">
+        📁 Open Mods Folder
+      </button>
+    </div>
+  </header>
+
+  <div class="main-layout">
+    <!-- Left Column: Master Module Cards & Overviews -->
+    <main class="content-panel">
+      <!-- Hero Banner -->
+      <section class="combined-hero">
+        <div>
+          <div class="combined-hero-title">
+            <span>📦</span> Master Mod Aggregator
+          </div>
+          <p class="combined-hero-desc">
+            All rules configured across each page are automatically saved. Select which features to combine into your single conflict-free mod.
+          </p>
+        </div>
+        <div class="batch-actions">
+          <button class="btn btn-sm btn-outline" id="btn-select-all-modules">✓ Select All</button>
+          <button class="btn btn-sm btn-ghost" id="btn-clear-all-data">🗑️ Clear All Rules</button>
+        </div>
+      </section>
+
+      <!-- Multiplayer Profiles Panel (Visible when targetMode === 'multiplayer') -->
+      <section class="multiplayer-profiles-panel" id="multiplayer-profiles-panel" style="display: none;">
+        <div class="panel-header">
+          <div>
+            <div class="panel-tag">ASYMMETRIC MULTIPLAYER SIM ENGINE</div>
+            <h2 class="panel-title">👥 Per-Player Roster & Profiles</h2>
+            <p class="panel-subtitle">
+              Configure different unit buffs, limits, and multipliers for several players or AI. Unlisted players run default vanilla stats.
+            </p>
+          </div>
+          <div class="preset-roster-actions">
+            <button class="btn btn-sm btn-outline" id="btn-preset-1v1" title="1v1 handicap match">⚡ 1v1 Asymmetric</button>
+            <button class="btn btn-sm btn-outline" id="btn-preset-boss" title="Co-op players vs Super-Buffed AI Boss">👑 Boss Raid</button>
+            <button class="btn btn-sm btn-outline" id="btn-preset-roles" title="Specialized roles">🤝 Co-op Roles</button>
+            <button class="btn btn-sm btn-primary" id="btn-add-profile">➕ Add Player</button>
+          </div>
+        </div>
+
+        <div class="profiles-cards-container" id="profiles-cards-container">
+          <!-- Rendered dynamically by combined.js -->
+        </div>
+      </section>
+
+      <!-- 4 Modules Grid -->
+      <div class="combined-modules-grid">
+        <!-- Module 1: Unit Stat Buffs -->
+        <div class="combined-module-card active" id="card-module-buffs">
+          <div class="module-header">
+            <div class="module-title-wrap">
+              <span class="module-icon">⚡</span>
+              <div>
+                <div class="module-title">Unit Stat Forge</div>
+                <span class="preset-category-tag">STAT MULTIPLIERS & DISCOUNTS</span>
+              </div>
+            </div>
+            <span class="module-status-badge enabled" id="status-badge-buffs">0 Units</span>
+          </div>
+
+          <div class="module-preview-list" id="preview-list-buffs">
+            <!-- Populated by combined.js -->
+          </div>
+
+          <div class="module-footer">
+            <label class="module-toggle-label">
+              <input type="checkbox" id="check-include-buffs" checked>
+              <span>Include in Combined Mod</span>
+            </label>
+            <a href="/" class="btn btn-sm btn-outline">✏️ Edit Buffs</a>
+          </div>
+        </div>
+
+        <!-- Module 2: Unit Limiter -->
+        <div class="combined-module-card active limits" id="card-module-limits">
+          <div class="module-header">
+            <div class="module-title-wrap">
+              <span class="module-icon">🛑</span>
+              <div>
+                <div class="module-title">Unit Limiter & Bans</div>
+                <span class="preset-category-tag">SIM TICK ENGINE RESTRICTIONS</span>
+              </div>
+            </div>
+            <span class="module-status-badge enabled" id="status-badge-limits">0 Limits</span>
+          </div>
+
+          <div class="module-preview-list" id="preview-list-limits">
+            <!-- Populated by combined.js -->
+          </div>
+
+          <div class="module-footer">
+            <label class="module-toggle-label">
+              <input type="checkbox" id="check-include-limits" checked>
+              <span>Include in Combined Mod</span>
+            </label>
+            <a href="/limits" class="btn btn-sm btn-outline">✏️ Edit Limits</a>
+          </div>
+        </div>
+
+        <!-- Module 3: Tactical Event Popups -->
+        <div class="combined-module-card active popups" id="card-module-popups">
+          <div class="module-header">
+            <div class="module-title-wrap">
+              <span class="module-icon">📢</span>
+              <div>
+                <div class="module-title">Tactical Event Popups</div>
+                <span class="preset-category-tag">IN-GAME ALERTS & PINPOINT CAMERA</span>
+              </div>
+            </div>
+            <span class="module-status-badge enabled" id="status-badge-popups">0 Alerts</span>
+          </div>
+
+          <div class="module-preview-list" id="preview-list-popups">
+            <!-- Populated by combined.js -->
+          </div>
+
+          <div class="module-footer">
+            <label class="module-toggle-label">
+              <input type="checkbox" id="check-include-popups" checked>
+              <span>Include in Combined Mod</span>
+            </label>
+            <a href="/popups" class="btn btn-sm btn-outline">✏️ Edit Popups</a>
+          </div>
+        </div>
+
+        <!-- Module 4: Relic Objectives -->
+        <div class="combined-module-card active relics" id="card-module-relics">
+          <div class="module-header">
+            <div class="module-title-wrap">
+              <span class="module-icon">💎</span>
+              <div>
+                <div class="module-title">Relic & Crate Objectives</div>
+                <span class="preset-category-tag">BATTLEFIELD CAPTURE & BUFFS</span>
+              </div>
+            </div>
+            <span class="module-status-badge enabled" id="status-badge-relics">0 Objectives</span>
+          </div>
+
+          <div class="module-preview-list" id="preview-list-relics">
+            <!-- Populated by combined.js -->
+          </div>
+
+          <div class="module-footer">
+            <label class="module-toggle-label">
+              <input type="checkbox" id="check-include-relics" checked>
+              <span>Include in Combined Mod</span>
+            </label>
+            <a href="/relics" class="btn btn-sm btn-outline">✏️ Edit Relics</a>
+          </div>
+        </div>
+
+        <!-- Module 5: Surprise Casino & Lootbox Engine -->
+        <div class="combined-module-card active" id="card-module-lootbox" style="border-color: #ffd700;">
+          <div class="module-header">
+            <div class="module-title-wrap">
+              <span class="module-icon" style="filter: drop-shadow(0 0 8px rgba(255,215,0,0.5));">🎰</span>
+              <div>
+                <div class="module-title">Surprise Casino & Lootbox</div>
+                <span class="preset-category-tag" style="background: rgba(255,215,0,0.15); color: #ffd700; border-color: #ffd700;">CASINO SPIN & LUCK MECHANICS</span>
+              </div>
+            </div>
+            <span class="module-status-badge enabled" id="status-badge-lootbox" style="border-color: #ffd700; color: #ffd700;">0 Outcomes</span>
+          </div>
+
+          <div class="module-preview-list" id="preview-list-lootbox">
+            <!-- Populated by combined.js -->
+          </div>
+
+          <div class="module-footer">
+            <label class="module-toggle-label">
+              <input type="checkbox" id="check-include-lootbox" checked>
+              <span>Include in Combined Mod</span>
+            </label>
+            <a href="/lootbox" class="btn btn-sm btn-outline" style="border-color: #ffd700; color: #ffd700;">✏️ Edit Casino</a>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Right Column: Combined Mod Packaging Settings -->
+    <aside class="sidebar-panel">
+      <div class="sidebar-card">
+        <h2 class="sidebar-title">🚀 Pack Combined Mod</h2>
+        <p class="limits-section-subtitle" style="margin-bottom: 14px;">
+          Packages all enabled modules into a single unified mod directory in Supreme Commander.
+        </p>
+
+        <!-- Rule Breakdown Box -->
+        <div class="breakdown-box">
+          <div class="breakdown-row">
+            <span class="breakdown-label"><span>⚡</span> Unit Buffs:</span>
+            <span class="breakdown-val" id="bd-buffs-val">0</span>
+          </div>
+          <div class="breakdown-row">
+            <span class="breakdown-label"><span>🛑</span> Unit Limits:</span>
+            <span class="breakdown-val" id="bd-limits-val">0</span>
+          </div>
+          <div class="breakdown-row">
+            <span class="breakdown-label"><span>📢</span> Event Popups:</span>
+            <span class="breakdown-val" id="bd-popups-val">0</span>
+          </div>
+          <div class="breakdown-row">
+            <span class="breakdown-label"><span>💎</span> Relic Objectives:</span>
+            <span class="breakdown-val" id="bd-relics-val">0</span>
+          </div>
+          <div class="breakdown-row">
+            <span class="breakdown-label"><span>🎰</span> Surprise Casino:</span>
+            <span class="breakdown-val" id="bd-lootbox-val" style="color: #ffd700;">0</span>
+          </div>
+          <div class="breakdown-row" id="bd-profiles-row" style="display: none;">
+            <span class="breakdown-label"><span>👥</span> Player Profiles:</span>
+            <span class="breakdown-val" id="bd-profiles-val">0</span>
+          </div>
+          <div class="breakdown-row total">
+            <span class="breakdown-label">Total Included Rules:</span>
+            <span class="breakdown-val" id="bd-total-val" style="color: #34d399;">0</span>
+          </div>
+        </div>
+
+        <!-- Mod Metadata Form -->
+        <div class="form-group">
+          <label for="input-mod-name">Combined Mod Name</label>
+          <input type="text" id="input-mod-name" value="FAF Master Overhaul" placeholder="e.g. Total Mayhem Overhaul">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group half">
+            <label for="input-author">Author</label>
+            <input type="text" id="input-author" value="User" placeholder="Your name">
+          </div>
+          <div class="form-group half">
+            <label for="input-version">Version</label>
+            <input type="number" id="input-version" value="1" min="1" step="1">
+          </div>
+        </div>
+
+        <hr class="divider">
+
+        <!-- Target Scope -->
+        <div class="form-group">
+          <label class="section-label">Target Scope</label>
+          <div class="scope-options">
+            <label class="scope-radio-card active" id="card-scope-player">
+              <input type="radio" name="target-scope" value="player" checked>
+              <div class="scope-radio-content">
+                <div class="scope-radio-title">👑 Specific Player Only</div>
+                <div class="scope-radio-desc">Sim Hook enforces buffs & limits for your nickname only.</div>
+              </div>
+            </label>
+
+            <label class="scope-radio-card" id="card-scope-multiplayer">
+              <input type="radio" name="target-scope" value="multiplayer">
+              <div class="scope-radio-content">
+                <div class="scope-radio-title">👥 Multiplayer Profiles</div>
+                <div class="scope-radio-desc">Asymmetric rules: unique buffs, limits & handicaps per player.</div>
+              </div>
+            </label>
+
+            <label class="scope-radio-card" id="card-scope-global">
+              <input type="radio" name="target-scope" value="global">
+              <div class="scope-radio-content">
+                <div class="scope-radio-title">🌐 Global / Match Wide</div>
+                <div class="scope-radio-desc">Enforces rules across all players in the lobby equally.</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group" id="group-player-name">
+          <label for="input-player-name">Player Nickname (FAF In-Game Name)</label>
+          <input type="text" id="input-player-name" value="User" placeholder="Exact FAF lobby nickname">
+          <span class="field-hint">Must match your in-game username in the FAF lobby.</span>
+        </div>
+
+        <hr class="divider">
+
+        <!-- Export Action -->
+        <div class="export-section">
+          <button class="btn btn-primary btn-block btn-lg" id="btn-export-combined">
+            🚀 Pack & Export Combined Mod (<span id="btn-combined-count">0</span> rules)
+          </button>
+        </div>
+
+        <div id="export-feedback" class="feedback-card" style="display: none;"></div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Notification Toast -->
+  <div id="toast" class="toast"></div>
+
+  <script src="/static/js/forge-store.js"></script>
+  <script src="/static/js/combined.js"></script>
+</body>
+</html>

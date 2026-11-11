@@ -1,0 +1,12 @@
+name = "Raptor Swarm Faction"
+version = 7
+copyright = "Beyond All Reason & FAF Communities"
+description = "Exhaustive, 100% complete standalone biological Raptor Swarm race ported directly from Beyond All Reason (BAR). Features 31 production-ready units across T1, T2, T3, and T4 Experimental! Includes small & heavy versions (Mini Swarmers, Behemoth Heavy Dodos), Electric EMP Shock Ticks with shield disrupters, Brood Bombers with living swarmer-spawning egg salvos, Pyro All-Terrain Flamers, the Psychic Brain Bug Overseer (omni-vision & radar stealth jammer), the Raptor Matriarch Sub-Boss, and the Experimental Raptor Queen Titan!"
+author = "BAR & FAF"
+uid = "raptor-swarm-faction-faf-0007"
+selectable = true
+enabled = true
+exclusive = false
+ui_only = false
+icon = "/mods/RaptorFaction/icon.png"
+requires = {}

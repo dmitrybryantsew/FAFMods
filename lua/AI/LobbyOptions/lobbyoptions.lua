@@ -1,0 +1,96 @@
+-- ****************************************************************************
+-- **
+-- **  File     :  /lua/AI/LobbyOptions/lobbyoptions.lua
+-- **  Author   :  Raptor Swarm Faction Port from BAR
+-- **  Summary  :  FAF Lobby Options for the Raptor Swarm Defense mode.
+-- **  Note     :  Do NOT use bare '%' characters in text/help strings; FAF passes
+-- **              them through LOCF (string.format) which crashes on bare '%'.
+-- **
+-- ****************************************************************************
+
+AIOpts = {
+    {
+        default = 1,
+        label = "Raptor Defense Mode",
+        help = "Controls whether the biological Raptor Swarm invasion engine is active.",
+        key = 'RaptorFactionMode',
+        values = {
+            { text = "Auto (Active if Raptor AI / AI present)", help = "Starts automatically when AI: Raptor Swarm or any enemy AI is selected", key = 'auto' },
+            { text = "Always Enabled", help = "Forces Raptor Swarm invasion engine to activate on the first enemy AI slot", key = 'enabled' },
+            { text = "Disabled", help = "Standard skirmish without Raptor Swarm invasion", key = 'disabled' },
+        },
+    },
+    {
+        default = 3,
+        label = "Raptor Difficulty",
+        help = "Controls wave intervals, tech anger speed, unit health/damage multipliers, and Queen awakening timing.",
+        key = 'RaptorDifficulty',
+        values = {
+            { text = "Very Easy", help = "Relaxed pacing, 9 min grace period, Queen awakens at 55 min", key = 'veryeasy' },
+            { text = "Easy", help = "Gentle progression, 8 min grace period, Queen awakens at 50 min", key = 'easy' },
+            { text = "Normal", help = "Standard balanced BAR experience, 7 min grace period, Queen at 45 min", key = 'normal' },
+            { text = "Hard", help = "Aggressive swarms, 6 min grace period, Queen at 40 min", key = 'hard' },
+            { text = "Very Hard", help = "Relentless onslaught, 5 min grace period, Queen at 35 min", key = 'veryhard' },
+            { text = "Epic", help = "Brutal challenge for master teams, 4 min grace period, Queen at 30 min", key = 'epic' },
+        },
+    },
+    {
+        default = 1,
+        label = "Raptor Wave Size",
+        help = "Multiplies the total number of biological units spawned per Hive in every wave.",
+        key = 'RaptorSpawnCountMult',
+        values = {
+            { text = "1.0x (Standard Waves)", help = "Standard unit numbers", key = '1.0' },
+            { text = "1.5x (Heavy Swarms)", help = "+50 percent more raptors per wave", key = '1.5' },
+            { text = "2.0x (Double Swarms)", help = "Double raptor numbers per wave", key = '2.0' },
+            { text = "3.0x (Triple Swarms)", help = "Triple raptor numbers per wave", key = '3.0' },
+            { text = "5.0x (Apocalyptic Swarms)", help = "Insane density for large co-op teams", key = '5.0' },
+        },
+    },
+    {
+        default = 3,
+        label = "Raptor Queen Hatch Time",
+        help = "Scales how quickly Queen Anger climbs from 0 to 100 percent awakening.",
+        key = 'RaptorQueenHatchMult',
+        values = {
+            { text = "0.5x (Super Fast Queen)", help = "Queen awakens in half the normal time", key = '0.5' },
+            { text = "0.75x (Fast Queen)", help = "Queen awakens 25 percent faster", key = '0.75' },
+            { text = "1.0x (Standard Time)", help = "Standard Queen timer based on difficulty", key = '1.0' },
+            { text = "1.5x (Extended Match)", help = "50 percent more time before the Queen awakens", key = '1.5' },
+            { text = "2.0x (Double Buildup Time)", help = "Double time before the Queen awakens", key = '2.0' },
+        },
+    },
+    {
+        default = 2,
+        label = "Raptor Grace Period",
+        help = "Scales the initial peacetime before the first wave and hives begin expanding.",
+        key = 'RaptorGracePeriodMult',
+        values = {
+            { text = "0.5x (Short Peacetime)", help = "First wave arrives twice as fast", key = '0.5' },
+            { text = "1.0x (Standard Grace Period)", help = "Standard peacetime per difficulty", key = '1.0' },
+            { text = "1.5x (Extended Buildup)", help = "Extra time to establish eco and defenses", key = '1.5' },
+            { text = "2.0x (Long Buildup)", help = "Double peacetime before the first wave", key = '2.0' },
+        },
+    },
+    {
+        default = 1,
+        label = "Raptor Hive Placement",
+        help = "Controls how Hives (Burrows) are positioned across the map as the match progresses.",
+        key = 'RaptorPlacement',
+        values = {
+            { text = "Growing Spawn Box", help = "Hives expand in a growing perimeter toward center as Tech Anger rises", key = 'initialbox' },
+            { text = "Enemy Start Box Only", help = "Hives strictly stay in the assigned enemy start territory", key = 'alwaysbox' },
+            { text = "Spawn Anywhere (Avoid LOS)", help = "Hives can burrow up anywhere outside player radar/vision", key = 'avoid' },
+        },
+    },
+    {
+        default = 1,
+        label = "Raptor Endless Mode",
+        help = "When the Queen Titan is defeated, the match does not end. Waves loop infinitely with escalating stats.",
+        key = 'RaptorEndless',
+        values = {
+            { text = "Disabled (Queen Death Wins)", help = "Destroying the Queen Titan achieves complete victory", key = 'disabled' },
+            { text = "Enabled (Infinitely Escalating)", help = "Difficulty tier resets to Wave 1 with +50 percent higher stats each loop", key = 'enabled' },
+        },
+    },
+}

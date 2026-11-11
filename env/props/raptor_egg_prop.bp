@@ -1,0 +1,37 @@
+PropBlueprint {
+    Categories = {
+        'RECLAIMABLE',
+    },
+    Defense = {
+        Health = 1000,
+        MaxHealth = 1000,
+    },
+    Display = {
+        Mesh = {
+            IconFadeInZoom = 130,
+            LODs = {
+                {
+                    AlbedoName = 'raptor_egg_Albedo.dds',
+                    LODCutoff = 250,
+                    MeshName = 'raptor_egg_lod0.scm',
+                    ShaderName = 'Unit',
+                },
+            },
+        },
+        UniformScale = 0.12,
+    },
+    Economy = {
+        ReclaimEnergyMax = 100,
+        ReclaimMassMax = 50,
+        ReclaimTime = 2,
+    },
+    Interface = {
+        HelpText = 'Biological Raptor Egg',
+    },
+    Physics = {
+        BlockPath = false,
+    },
+    SizeX = 0.5,
+    SizeY = 0.5,
+    SizeZ = 0.5,
+}

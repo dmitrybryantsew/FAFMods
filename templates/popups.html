@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FAF Mod Forge - In-Game Tactical Event Popups & Alerts</title>
+  <link rel="stylesheet" href="/static/css/spooky.css">
+  <link rel="stylesheet" href="/static/css/app.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-left">
+      <div class="logo-mark">FAF</div>
+      <div>
+        <h1 class="logo-title">EVENT POPUPS</h1>
+        <p class="logo-subtitle">Interactive in-game text notifications with pinpoint camera buttons</p>
+      </div>
+      <nav class="nav-links">
+        <a href="/" class="nav-link">⚡ Unit Stat Forge <span class="nav-badge" id="nav-count-buffs">0</span></a>
+        <a href="/limits" class="nav-link limits">🛑 Unit Limiter <span class="nav-badge" id="nav-count-limits">0</span></a>
+        <a href="/popups" class="nav-link active popups">📢 Event Popups <span class="nav-badge" id="nav-count-popups">0</span></a>
+        <a href="/relics" class="nav-link relics">💎 Relic Objectives <span class="nav-badge" id="nav-count-relics">0</span></a>
+        <a href="/lootbox" class="nav-link lootbox">🎰 Surprise Casino <span class="nav-badge" id="nav-count-lootbox">0</span></a>
+        <a href="/combined" class="nav-link combined">📦 Combined Mod <span class="nav-badge accent" id="nav-count-combined">0</span></a>
+      </nav>
+    </div>
+    <div class="header-right">
+      <div class="stats-badge">
+        <span class="badge-label">Active Popups:</span>
+        <span class="badge-val" id="total-popups-count">0</span>
+      </div>
+      <button class="btn btn-secondary" id="btn-open-folder" title="Open Supreme Commander Mods directory in File Explorer">
+        📁 Open Mods Folder
+      </button>
+    </div>
+  </header>
+
+  <div class="main-layout">
+    <!-- Left Column: Presets, Custom Builder & Live Preview -->
+    <main class="content-panel">
+      <!-- Section 1: Quick Presets -->
+      <section class="filters-card">
+        <div class="popups-section-header">
+          <div>
+            <h2 class="popups-section-title">⚡ Quick Event Presets</h2>
+            <p class="popups-section-subtitle">Add instant tactical alerts for Experimentals, Nukes, ACU danger, and Paragon with 1 click</p>
+          </div>
+          <div class="batch-actions">
+            <button class="btn btn-sm btn-outline" id="btn-enable-recommended-presets">✓ Add Recommended</button>
+            <button class="btn btn-sm btn-ghost" id="btn-clear-presets">Clear Presets</button>
+          </div>
+        </div>
+
+        <div class="popup-preset-grid" id="preset-grid">
+          <!-- Populated by popups.js -->
+        </div>
+      </section>
+
+      <!-- Section 2: Custom Popup Builder -->
+      <section class="filters-card">
+        <div class="popups-section-header">
+          <div>
+            <h2 class="popups-section-title">🛠️ Custom Event Popup Builder</h2>
+            <p class="popups-section-subtitle">Build customized notifications for any unit spawn, kill, low health, or match milestone</p>
+          </div>
+        </div>
+
+        <!-- Step 1: Trigger Condition & Unit Selection -->
+        <div class="builder-step-card">
+          <div class="builder-step-title">
+            <span class="builder-step-num">1</span> Trigger Event & Target Condition
+          </div>
+
+          <div class="form-row">
+            <div class="form-group half">
+              <label for="builder-trigger">Trigger Event</label>
+              <select id="builder-trigger" class="custom-select">
+                <option value="unit_built" selected>✨ Unit Completed / Spawned</option>
+                <option value="unit_killed">💥 Unit Destroyed / Killed</option>
+                <option value="health_low">🚨 Unit Health Dropped Below % (Danger Alert)</option>
+                <option value="match_timer">⏱️ Match Timer Milestone Elapsed</option>
+              </select>
+            </div>
+
+            <!-- Health % (conditional) -->
+            <div class="form-group half" id="group-health-pct" style="display: none;">
+              <label for="builder-health-pct">Health Threshold (%)</label>
+              <input type="number" id="builder-health-pct" value="35" min="5" max="90" step="5">
+              <span class="field-hint">Triggers once when health drops to or below this %</span>
+            </div>
+
+            <!-- Timer (conditional) -->
+            <div class="form-group half" id="group-timer-sec" style="display: none;">
+              <label for="builder-timer-min">Match Time (Minutes)</label>
+              <input type="number" id="builder-timer-min" value="15" min="1" max="180" step="1">
+              <span class="field-hint">Alert triggers when match reaches this elapsed time</span>
+            </div>
+
+            <div class="form-group half" id="group-target-category">
+              <label for="builder-category-select">Target Category / Scope</label>
+              <select id="builder-category-select" class="custom-select">
+                <option value="selected_unit">🎯 Pick Specific Unit (from grid below)</option>
+                <option value="categories.EXPERIMENTAL">🚀 Any Experimental (T4 Units)</option>
+                <option value="categories.STRATEGIC * categories.SILO">☢️ Any Strategic Nuke Silo</option>
+                <option value="categories.COMMAND">👑 Any ACU (Armored Command Unit)</option>
+                <option value="categories.TECH3 * categories.ARTILLERY * categories.STRUCTURE">🎯 Any T3 Heavy Artillery</option>
+                <option value="categories.MASSEXTRACTION * categories.TECH3">💎 Any T3 Mass Extractor</option>
+                <option value="categories.EXPERIMENTAL * categories.ECONOMIC">👑 Aeon Paragon</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Unit Selector Sub-section (visible when selected_unit is active) -->
+          <div id="unit-selector-wrapper">
+            <div class="target-preview-box" id="selected-unit-preview" style="display: none;">
+              <div class="target-preview-left">
+                <div id="preview-unit-icon"></div>
+                <div>
+                  <div class="target-preview-name" id="preview-unit-name">No unit picked</div>
+                  <div class="target-preview-meta" id="preview-unit-meta">Click any unit in the grid below to target it</div>
+                </div>
+              </div>
+              <button class="btn btn-sm btn-ghost" id="btn-clear-picked-unit">✕ Deselect</button>
+            </div>
+
+            <div class="filter-row search-row" style="margin-top: 10px;">
+              <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="unit-search" placeholder="Search 503 units to target (e.g. Fatboy, Mantis, Colossus, Megalith, UEL0401)...">
+                <button id="clear-unit-search" class="btn-clear" style="display: none;">✕</button>
+              </div>
+            </div>
+
+            <div class="filter-row filter-chips-row">
+              <div class="filter-group">
+                <span class="filter-group-title">Faction:</span>
+                <div class="chips-container" id="unit-faction-chips">
+                  <button class="chip active" data-filter="faction" data-val="ALL">All</button>
+                  <button class="chip uef" data-filter="faction" data-val="UEF">UEF</button>
+                  <button class="chip cybran" data-filter="faction" data-val="Cybran">Cybran</button>
+                  <button class="chip aeon" data-filter="faction" data-val="Aeon">Aeon</button>
+                  <button class="chip seraphim" data-filter="faction" data-val="Seraphim">Seraphim</button>
+                </div>
+              </div>
+
+              <div class="filter-group">
+                <span class="filter-group-title">Tier:</span>
+                <div class="chips-container" id="unit-tech-chips">
+                  <button class="chip active" data-filter="tech" data-val="ALL">All</button>
+                  <button class="chip" data-filter="tech" data-val="T1">T1</button>
+                  <button class="chip" data-filter="tech" data-val="T2">T2</button>
+                  <button class="chip" data-filter="tech" data-val="T3">T3</button>
+                  <button class="chip exp" data-filter="tech" data-val="EXP">EXP</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="unit-grid" id="builder-unit-grid" style="max-height: 240px; overflow-y: auto; margin-top: 10px;">
+              <!-- Populated by popups.js -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2: Popup Text & Audio Appearance -->
+        <div class="builder-step-card">
+          <div class="builder-step-title">
+            <span class="builder-step-num">2</span> Popup Content & Audio Theme
+          </div>
+
+          <div class="form-group">
+            <label for="builder-title">Popup Header Title</label>
+            <input type="text" id="builder-title" value="⚠️ EXPERIMENTAL DETECTED" placeholder="e.g. TACTICAL RECON, THREAT DETECTED">
+          </div>
+
+          <div class="form-group">
+            <label for="builder-text">Notification Message Body</label>
+            <input type="text" id="builder-text" value="A hostile {UnitName} has completed construction! Pinpoint to engage." placeholder="Use {UnitName} to automatically insert unit name">
+            <span class="field-hint">💡 Pro-tip: Use <code>{UnitName}</code> in your text to automatically insert the unit's in-game name.</span>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group third">
+              <label for="builder-theme">Visual Theme / Color</label>
+              <select id="builder-theme" class="custom-select">
+                <option value="danger" selected>🔴 Danger / Alert (Red)</option>
+                <option value="intel">🔵 Recon / Intel (Cyan)</option>
+                <option value="tactical">🟡 Tactical Warning (Amber)</option>
+                <option value="ally">🟢 Friendly / Objective (Emerald)</option>
+                <option value="quantum">🟣 Quantum / Exotic (Purple)</option>
+              </select>
+            </div>
+
+            <div class="form-group third">
+              <label for="builder-sound">Sound Cue</label>
+              <select id="builder-sound" class="custom-select">
+                <option value="UI_Radar_Blip" selected>🔊 Radar Blip (Recon)</option>
+                <option value="UI_Alarm">🚨 Combat Alarm (Siren)</option>
+                <option value="UI_Objective_Complete">✨ Objective Complete (Chime)</option>
+                <option value="UI_Generic_Click">🔘 Subtle Click</option>
+                <option value="None">🔇 Silent (No Audio)</option>
+              </select>
+            </div>
+
+            <div class="form-group third">
+              <label for="builder-duration">Auto-Dismiss Duration</label>
+              <select id="builder-duration" class="custom-select">
+                <option value="5">5 Seconds</option>
+                <option value="8" selected>8 Seconds (Recommended)</option>
+                <option value="12">12 Seconds</option>
+                <option value="20">20 Seconds</option>
+                <option value="0">Stay until clicked</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3: Interactive Buttons -->
+        <div class="builder-step-card">
+          <div class="builder-step-title">
+            <span class="builder-step-num">3</span> Interactive Buttons & Camera Action
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+              <input type="checkbox" id="chk-pinpoint" checked style="width: 18px; height: 18px; accent-color: var(--accent-cyan);">
+              <div>
+                <strong style="color: #fff;">🎯 Button 1: Pinpoint / Jump Camera</strong>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">Smoothly pans the player's camera to the unit's coordinates when clicked.</div>
+              </div>
+            </label>
+
+            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+              <input type="checkbox" id="chk-ping" checked style="width: 18px; height: 18px; accent-color: var(--accent-cyan);">
+              <div>
+                <strong style="color: #fff;">📍 Spawn Visual 3D Map Ping Arrow</strong>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">Places a temporary tactical arrow marker on the 3D map & minimap at the event spot.</div>
+              </div>
+            </label>
+
+            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+              <input type="checkbox" id="chk-dismiss" checked style="width: 18px; height: 18px; accent-color: var(--accent-cyan);">
+              <div>
+                <strong style="color: #fff;">✕ Button 2: Dismiss Button</strong>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">Allows the player to close the notification immediately.</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Step 4: Live In-Game HUD Preview -->
+        <div class="builder-step-card">
+          <div class="builder-step-title" style="margin-bottom: 6px;">
+            <span class="builder-step-num">4</span> Live In-Game HUD Preview
+          </div>
+          <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 12px;">
+            Simulated view of how this notification card will render inside Supreme Commander Forged Alliance:
+          </p>
+
+          <div class="preview-stage-container">
+            <div class="preview-stage-grid"></div>
+            <div class="preview-badge-hud">In-Game UI Simulation</div>
+
+            <!-- Simulated Popup Card -->
+            <div class="in-game-card theme-danger" id="live-in-game-card">
+              <div class="in-game-card-top-border"></div>
+              <div class="in-game-card-body">
+                <div class="in-game-header-row">
+                  <div class="in-game-status-dot"></div>
+                  <span class="in-game-title" id="preview-card-title">⚠️ EXPERIMENTAL DETECTED</span>
+                </div>
+                <div class="in-game-message" id="preview-card-message">
+                  A hostile Fatboy has completed construction! Pinpoint to engage.
+                </div>
+                <div class="in-game-btn-row">
+                  <button class="in-game-btn pinpoint" id="preview-btn-pinpoint" type="button">
+                    🎯 Pinpoint Location
+                  </button>
+                  <button class="in-game-btn dismiss" id="preview-btn-dismiss" type="button">
+                    ✕ Dismiss
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top: 16px; display: flex; justify-content: flex-end;">
+            <button class="btn btn-primary btn-lg" id="btn-add-custom-popup">
+              ➕ Add Event Popup Rule
+            </button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Right Column: Settings & Active Rules Summary -->
+    <aside class="sidebar-panel">
+      <!-- Target Player & Mod Setup -->
+      <div class="sidebar-card">
+        <h2 class="sidebar-title">👑 Target & Mod Settings</h2>
+
+        <div class="form-group">
+          <label class="section-label">Target Audience Scope</label>
+          <div class="scope-options">
+            <label class="scope-radio-card active" id="card-scope-global">
+              <input type="radio" name="target-scope" value="global" checked>
+              <div class="scope-radio-content">
+                <div class="scope-radio-title">🌐 Global / All Players</div>
+                <div class="scope-radio-desc">Broadcast notification to all players in the match.</div>
+              </div>
+            </label>
+
+            <label class="scope-radio-card" id="card-scope-player">
+              <input type="radio" name="target-scope" value="player">
+              <div class="scope-radio-content">
+                <div class="scope-radio-title">👑 Specific Player Only</div>
+                <div class="scope-radio-desc">Popup displays exclusively for this player's screen.</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group" id="group-player-name" style="display: none;">
+          <label for="input-player-name">Player Nickname (FAF In-Game Name)</label>
+          <input type="text" id="input-player-name" value="User" placeholder="Exact FAF lobby name">
+          <span class="field-hint">Must match the player's nickname in the FAF game lobby.</span>
+        </div>
+
+        <hr class="divider">
+
+        <div class="form-group">
+          <label for="input-mod-name">Mod Name</label>
+          <input type="text" id="input-mod-name" value="Tactical Event Popups" placeholder="e.g. Boss Spawn Alerts">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group half">
+            <label for="input-author">Author</label>
+            <input type="text" id="input-author" value="User" placeholder="Your name">
+          </div>
+          <div class="form-group half">
+            <label for="input-version">Version</label>
+            <input type="number" id="input-version" value="1" min="1" step="1">
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Rules Card -->
+      <div class="sidebar-card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <h2 class="sidebar-title" style="margin-bottom: 0;">📢 Active Popups (<span id="active-badge-count">0</span>)</h2>
+          <button class="btn btn-sm btn-ghost" id="btn-clear-all-rules" title="Remove all active rules">Clear All</button>
+        </div>
+
+        <div class="active-rules-container" id="active-rules-container">
+          <!-- Populated dynamically -->
+          <div class="rules-empty-box" id="rules-empty-state">
+            <span>No popups configured yet.<br>Click a quick preset above or build your own!</span>
+          </div>
+        </div>
+
+        <hr class="divider">
+
+        <!-- Export Action -->
+        <div class="export-section">
+          <button class="btn btn-primary btn-block btn-lg" id="btn-export-popups">
+            🚀 Pack & Export Popups Mod (<span id="btn-popups-count">0</span> rules)
+          </button>
+        </div>
+
+        <div id="export-feedback" class="feedback-card" style="display: none;"></div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Notification Toast -->
+  <div id="toast" class="toast"></div>
+
+  <script src="/static/js/forge-store.js"></script>
+  <script src="/static/js/popups.js"></script>
+</body>
+</html>
