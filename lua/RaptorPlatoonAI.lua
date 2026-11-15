@@ -246,9 +246,11 @@ function WolfpackProwlThread(platoon, targetPos, flankMode)
     end
 
     local prowlTimer = 0
+    local overwhelmTimer = 0
     local orbitAngle = math.random() * 2 * math.pi
     local state = 'SPRINT' -- 'SPRINT' | 'PROWL' | 'OVERWHELM'
     local initialSprintDone = false
+    local justRetargeted = false  -- Prevents combat-lock from overriding a fresh SPRINT after retarget
 
     while platoon and brain:PlatoonExists(platoon) do
         local units = platoon:GetPlatoonUnits()
@@ -260,6 +262,8 @@ function WolfpackProwlThread(platoon, targetPos, flankMode)
             state = 'SPRINT'
             initialSprintDone = false
             prowlTimer = 0
+            overwhelmTimer = 0
+            justRetargeted = true
         end
 
         if targetPos then
@@ -284,9 +288,14 @@ function WolfpackProwlThread(platoon, targetPos, flankMode)
             local distToTarget = math.sqrt((packX - targetPos[1])^2 + (packZ - targetPos[3])^2)
 
             -- If in active combat (taking damage or shooting), fight to the death!
-            if IsPlatoonInCombat(platoon) then
+            -- BUT skip this override if we just retargeted — let SPRINT initialize first
+            if IsPlatoonInCombat(platoon) and not justRetargeted then
                 state = 'OVERWHELM'
+                overwhelmTimer = 0
             end
+
+            -- Clear the retarget guard once we've had a chance to process the new state
+            justRetargeted = false
 
             -- -------------------------------------------------------------
             -- STATE 1: SPRINT (Fast approach along flanking corridor)
@@ -308,6 +317,7 @@ function WolfpackProwlThread(platoon, targetPos, flankMode)
                     if standoffDist <= 0 then
                         -- Soft target (unfortified mex, radar, engineers) -> Immediate Overwhelm!
                         state = 'OVERWHELM'
+                        overwhelmTimer = 0
                         IssueClearCommands(units)
                         IssueAggressiveMove(units, targetPos)
                     else
@@ -345,6 +355,7 @@ function WolfpackProwlThread(platoon, targetPos, flankMode)
                 if targetDanger <= 0 or swarmPower >= (targetDanger * 1.20) then
                     -- Critical mass reached! UNLEASH THE OVERWHELM CHARGE!
                     state = 'OVERWHELM'
+                    overwhelmTimer = 0
                     IssueClearCommands(units)
                     IssueAggressiveMove(units, targetPos)
                 elseif prowlTimer >= 22.0 then
@@ -355,6 +366,8 @@ function WolfpackProwlThread(platoon, targetPos, flankMode)
                     state = 'SPRINT'
                     initialSprintDone = false
                     prowlTimer = 0
+                    overwhelmTimer = 0
+                    justRetargeted = true
                 else
                     -- Prowl & Orbit along the perimeter at safe standoff distance
                     orbitAngle = orbitAngle + 0.35 -- Rotate orbital positions
@@ -386,6 +399,8 @@ function WolfpackProwlThread(platoon, targetPos, flankMode)
             -- STATE 3: OVERWHELM (Synchronized 360-degree all-out charge)
             -- -------------------------------------------------------------
             elseif state == 'OVERWHELM' then
+                overwhelmTimer = overwhelmTimer + 3.0
+
                 local allOrdersDone = true
                 for _, u in units do
                     if u and not u.Dead and (not u.BeenDestroyed or not u:BeenDestroyed()) then
@@ -401,13 +416,24 @@ function WolfpackProwlThread(platoon, targetPos, flankMode)
                 end
 
                 -- If target area is cleared (no enemies remaining), retarget
-                local remainingEnemies = brain:GetUnitsAroundPoint(categories.ALLUNITS - categories.WALL, targetPos, 22.0, 'Enemy')
-                if not remainingEnemies or table.empty(remainingEnemies) then
+                -- Use 40-unit scan radius to account for ±15 target scatter and unit spread
+                local remainingEnemies = brain:GetUnitsAroundPoint(categories.ALLUNITS - categories.WALL, targetPos, 40.0, 'Enemy')
+                local areaCleared = (not remainingEnemies or table.empty(remainingEnemies))
+
+                -- Staleness safety: if stuck in OVERWHELM for 30s+ and all units are idle,
+                -- the target is effectively dead even if stray units linger at the edge of scan
+                if not areaCleared and overwhelmTimer >= 30.0 and allOrdersDone and distToTarget <= 25.0 then
+                    areaCleared = true
+                end
+
+                if areaCleared then
                     local currentPos = Vector(packX, GetSurfaceHeight(packX, packZ), packZ)
                     targetPos = Targeting.GetWeightedEnemyTarget(army, currentPos)
                     state = 'SPRINT'
                     initialSprintDone = false
                     prowlTimer = 0
+                    overwhelmTimer = 0
+                    justRetargeted = true
                 end
             end
         end

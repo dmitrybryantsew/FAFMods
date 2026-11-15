@@ -299,7 +299,7 @@ function TransitionToLandQueen(skyQueen)
     if not skyQueen then return end
 
     local brain = skyQueen:GetAIBrain()
-    local army = skyQueen.Army
+    local army = skyQueen:GetArmy()
     local pos = skyQueen:GetPosition()
     local cx = pos[1]
     local cz = pos[3]

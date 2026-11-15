@@ -104,13 +104,17 @@ local CachedMassMarkers = nil
 ---@param entry table Macro-decal entry
 ---@param newSize number Diameter of the decal quad in world units
 local function SwapDecalSize(entry, newSize)
+    if not entry or not entry.pos then return end
     local pos = entry.pos
-    local heading = entry.heading
+    local heading = entry.heading or 0
     local army = entry.army or -1
 
+    -- Ensure pos is a valid Vector
+    local decalPos = Vector(pos[1], pos[2], pos[3])
+
     -- 1. Create NEW decals FIRST in the DirectX 9 buffer:
-    local dAlb = CreateDecal(pos, heading, CreepAlbedo, '', 'Albedo', newSize, newSize, LOD_CUTOFF_ALBEDO, 0, army, 0)
-    local dNorm = CreateDecal(pos, heading, CreepNormals, '', 'Alpha Normals', newSize, newSize, LOD_CUTOFF_NORMAL, 0, army, 0)
+    local dAlb = CreateDecal(decalPos, heading, CreepAlbedo, '', 'Albedo', newSize, newSize, LOD_CUTOFF_ALBEDO, 0, army, 0)
+    local dNorm = CreateDecal(decalPos, heading, CreepNormals, '', 'Alpha Normals', newSize, newSize, LOD_CUTOFF_NORMAL, 0, army, 0)
     local newDecals = { dAlb, dNorm }
 
     -- 2. Destroy OLD decals AFTER new ones exist (Zero empty frames -> ZERO FLICKER):
@@ -145,20 +149,24 @@ end
 
 ---Smooth 3-stage growth thread for a macro-decal patch
 ---Reaches full maturity in 25 seconds with only 2 smooth, zero-gap swaps!
----@param entry table
-local function MacroDecalGrowthThread(entry)
+---@param arg1 any unit or entry
+---@param arg2 table|nil entry if called via unit:ForkThread
+local function MacroDecalGrowthThread(arg1, arg2)
+    local entry = arg2 or arg1
+    if not entry or not entry.pos then return end
+
     -- Stage 1: Sprout (42m diameter)
     SwapDecalSize(entry, MACRO_DECAL_SPROUT_SIZE)
     WaitSeconds(10.0)
 
     -- If no living supporters remain, abort
-    if table.empty(entry.supporters) then return end
+    if not entry.supporters or table.empty(entry.supporters) then return end
 
     -- Stage 2: Spreading (60m diameter)
     SwapDecalSize(entry, MACRO_DECAL_MID_SIZE)
     WaitSeconds(15.0)
 
-    if table.empty(entry.supporters) then return end
+    if not entry.supporters or table.empty(entry.supporters) then return end
 
     -- Stage 3: Full Mature Carpet (82m diameter)
     SwapDecalSize(entry, MACRO_DECAL_MATURE_SIZE)
@@ -184,21 +192,26 @@ local function RequestMacroDecal(unit, pos)
 
     -- 2. New territory! Spawn a new macro-decal patch
     local heading = math.random() * 6.2831853
+    local army = -1
+    if unit and not unit.Dead and unit.GetArmy then
+        army = unit:GetArmy()
+    end
+
     local entry = {
         id = NextDecalId,
-        pos = { pos[1], pos[2], pos[3] },
+        pos = Vector(pos[1], pos[2], pos[3]),
         heading = heading,
         currentSize = MACRO_DECAL_SPROUT_SIZE,
         currentRadius = MACRO_DECAL_SPROUT_SIZE * 0.45,
         decals = {},
         supporters = { [unit] = true },
-        army = unit.Army,
+        army = army,
     }
     NextDecalId = NextDecalId + 1
     table.insert(MacroDecals, entry)
 
     -- Launch smooth staged growth thread
-    unit:ForkThread(MacroDecalGrowthThread, entry)
+    ForkThread(MacroDecalGrowthThread, entry)
     return entry
 end
 
@@ -492,6 +505,10 @@ function StartCreepNode(unit, maxRadius, growthRate)
     end
 
     local pos = unit:GetPosition()
+    local army = -1
+    if unit and not unit.Dead and unit.GetArmy then
+        army = unit:GetArmy()
+    end
 
     local node = {
         unit = unit,
@@ -499,7 +516,7 @@ function StartCreepNode(unit, maxRadius, growthRate)
         maxRadius = maxRadius,
         growthRate = growthRate,
         currentRadius = math.min(12, maxRadius * 0.35),
-        army = unit.Army,
+        army = army,
         spawnTime = GetGameTimeSeconds(),
         baseAcidDps = baseAcidDps,
     }
