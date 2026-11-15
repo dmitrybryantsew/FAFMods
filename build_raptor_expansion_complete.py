@@ -279,7 +279,7 @@ def calc_xact_crc(data):
         crc = (crc >> 8) ^ CRC16_TABLE[idx]
     return (~crc) & 0xFFFF
 
-def build_xact_bank(soundbank_name, wavebank_name, cue_name, wav_bytes):
+def build_xact_bank(soundbank_name, wavebank_name, cue_name, wav_bytes, cat_id=6):
     with wave.open(io.BytesIO(wav_bytes), 'rb') as w:
         wav_pcm = w.readframes(w.getnframes())
         num_samples = w.getnframes()
@@ -319,6 +319,7 @@ def build_xact_bank(soundbank_name, wavebank_name, cue_name, wav_bytes):
     sb_name_64 = soundbank_name.encode('ascii')[:63].ljust(64, b'\x00')
     sb[0x4a : 0x4a + 64] = sb_name_64
     sb[0x8a : 0x8a + 64] = wb_name_64
+    struct.pack_into('<H', sb, 203, cat_id)
     sb[229] = 0  # loopCount = 0 (one-shot)
     for i in range(16):
         struct.pack_into('<H', sb, 239 + i*2, 0)
@@ -403,7 +404,6 @@ bp_biobomb = """ProjectileBlueprint {
     },
     Physics = {
         DestroyOnWater = true,
-        InitialSpeed = 0,
         Lifetime = 10,
         MaxSpeed = 30,
         RealisticOrdinance = true,
@@ -440,7 +440,7 @@ bp_queenplasma = """ProjectileBlueprint {
     Audio = {
         Impact = Sound {
             Bank = 'Impacts',
-            Cue = 'Cybran_Expl_Med_Impact',
+            Cue = 'CYB_Expl_Med_Impact',
             LodCutoff = 'Weapon_LodCutoff',
         },
     },
@@ -919,18 +919,31 @@ save_sca_file(os.path.join(dir_xra0104, "XRA0104_Adeath01.sca"), num_frames, dur
 bp_xra0104 = """UnitBlueprint {
     Air = {
         AutoLandTime = 1,
-        BankFactor = 2.5,
-        BreakOffDistance = 30,
+        BankFactor = 3,
+        BankForward = false,
+        BreakOffDistance = 34,
+        BreakOffIfNearNewTarget = true,
         BreakOffTrigger = 20,
         CanFly = true,
         CombatTurnSpeed = 1.5,
+        EngageDistance = 50,
+        KLift = 3,
+        KLiftDamping = 2.5,
         KMove = 1,
-        KTurn = 1,
+        KMoveDamping = 2,
+        KRoll = 2,
+        KRollDamping = 2,
+        KTurn = 0.8,
+        KTurnDamping = 1,
         LiftFactor = 10,
-        MaxAirspeed = 11.0,
-        MinAirspeed = 8.0,
-        StartTurnDistance = 10,
+        MaxAirspeed = 10,
+        MinAirspeed = 10,
+        PredictAheadForBombDrop = 3,
+        RandomBreakOffDistanceMult = 1.5,
+        StartTurnDistance = 1.4,
+        TightTurnMultiplier = 0,
         TurnSpeed = 1.5,
+        Winged = true,
     },
     Audio = {
         Destroyed = Sound {
@@ -1034,10 +1047,10 @@ bp_xra0104 = """UnitBlueprint {
         BuildOnLayerCaps = {
             LAYER_Air = true,
         },
-        Elevation = 10.0,
+        Elevation = 14.0,
         FuelRechargeRate = 0,
         FuelUseTime = 0,
-        MaxSpeed = 11.0,
+        MaxSpeed = 0.5,
         MotionType = 'RULEUMT_Air',
     },
     SelectionSizeX = 1.4,
@@ -1063,8 +1076,9 @@ bp_xra0104 = """UnitBlueprint {
             FireTargetLayerCapsTable = {
                 Air = 'Land|Water|Seabed',
             },
-            FiringRandomness = 0.5,
-            FiringTolerance = 3,
+            FiringRandomness = 0.05,
+            FiringTolerance = 6,
+            FixBombTrajectory = true,
             Label = 'Bomb',
             MaxRadius = 40,
             MuzzleSalvoDelay = 0.15,
@@ -1098,7 +1112,7 @@ bp_xra0104 = """UnitBlueprint {
                 'ALLUNITS',
             },
             TargetRestrictDisallow = 'UNTARGETABLE',
-            TrackingRadius = 1.15,
+            TrackingRadius = 1.25,
             TurretDualManipulators = false,
             Turreted = false,
             WeaponCategory = 'Bomb',
@@ -1280,16 +1294,21 @@ save_sca_file(os.path.join(dir_xra0109, "XRA0109_Adeath01.sca"), num_frames, dur
 bp_xra0109 = """UnitBlueprint {
     Audio = {
         Construct = Sound {
-            Bank = 'Raptor_Attack',
-            Cue = 'Attack',
+            Bank = 'URL',
+            Cue = 'URL0105_Construct_Start',
+            LodCutoff = 'UnitMove_LodCutoff',
+        },
+        ConstructLoop = Sound {
+            Bank = 'URL',
+            Cue = 'URL0105_Construct_Loop',
+            LodCutoff = 'UnitMove_LodCutoff',
+        },
+        UISelection = Sound {
+            Bank = 'Interface',
+            Cue = 'Cybran_Select_Vehicle',
             LodCutoff = 'UnitMove_LodCutoff',
         },
         Destroyed = Sound {
-            Bank = 'Raptor_Death',
-            Cue = 'Death',
-            LodCutoff = 'UnitMove_LodCutoff',
-        },
-        Killed = Sound {
             Bank = 'Raptor_Death',
             Cue = 'Death',
             LodCutoff = 'UnitMove_LodCutoff',

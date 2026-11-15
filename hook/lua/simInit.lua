@@ -48,6 +48,7 @@ function BeginSession()
 
         -- 3. Launch Spawner if Raptor/AI army exists
         if raptorArmy and raptorBrain then
+            raptorBrain.IsRaptorSwarm = true
             LOG("* RAPTOR FACTION: Launching Raptor Swarm Defense on Army " .. tostring(raptorArmy) .. " (Difficulty: " .. tostring(diff) .. ")")
 
             -- 1. Ensure primary hive exists at start spot so army is never Commander-less

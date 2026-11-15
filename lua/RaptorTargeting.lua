@@ -131,47 +131,92 @@ function UnregisterUnitTarget(unit)
     end
 end
 
----Picks a weighted random enemy location across all registered targets
+---Picks an economy target weighted by value, discounted by distance, and filtered by defensive threat
 ---@param raptorArmy number Army index of the Raptor swarm
+---@param originPos Vector3|nil Launching position (hive or platoon centroid)
 ---@return Vector3|nil TargetPosition
-function GetWeightedRandomEnemyTarget(raptorArmy)
+function GetWeightedEnemyTarget(raptorArmy, originPos)
     if TotalEcoWeight <= 0 or table.empty(TargetRegistry) then
         return GetFallbackEnemyTarget(raptorArmy)
     end
 
-    local roll = math.random() * TotalEcoWeight
-    local cumulative = 0
+    local aiBrain = nil
+    if raptorArmy then
+        if type(raptorArmy) == 'number' then
+            aiBrain = GetArmyBrain(raptorArmy)
+        elseif type(raptorArmy) == 'table' or type(raptorArmy) == 'userdata' then
+            aiBrain = raptorArmy
+        end
+    end
+
+    local bestTarget = nil
+    local highestScore = -1
 
     for entityId, data in TargetRegistry do
         local u = data.unit
         if u and not u.Dead and not u:BeenDestroyed() then
-            -- Verify unit belongs to an enemy army
             if not raptorArmy or u:GetArmy() ~= raptorArmy then
-                cumulative = cumulative + data.weight
-                if roll <= cumulative then
-                    local pos = u:GetPosition()
-                    -- Add scatter offset (+/- 24 units) to prevent exact single-point stacking
-                    pos[1] = pos[1] + (math.random(-24, 24))
-                    pos[3] = pos[3] + (math.random(-24, 24))
-                    pos[2] = GetSurfaceHeight(pos[1], pos[3])
-                    return pos
+                local uPos = u:GetPosition()
+                local dist = 100.0
+                if originPos then
+                    local dx = uPos[1] - originPos[1]
+                    local dz = uPos[3] - originPos[3]
+                    dist = math.sqrt(dx * dx + dz * dz)
+                end
+
+                -- Distance attenuation: nearby targets score exponentially higher than distant ones
+                local distFactor = math.max(1.0, dist * 0.015)
+
+                -- Defensive threat discount: favor unfortified or lightly defended expansions
+                local threatFactor = 1.0
+                if aiBrain and aiBrain.GetThreatAtPosition then
+                    local threat = aiBrain:GetThreatAtPosition(uPos, 1, true, 'AntiSurface') or 0
+                    if threat > 0 then
+                        threatFactor = 1.0 + (threat * 0.04)
+                    end
+                end
+
+                -- Combined score with small random jitter (0.8 - 1.2) to prevent deterministic lock
+                local score = (data.weight / (distFactor * distFactor * threatFactor)) * (0.8 + math.random() * 0.4)
+
+                if score > highestScore then
+                    highestScore = score
+                    bestTarget = Vector(uPos[1], uPos[2], uPos[3])
                 end
             end
         else
             -- Clean dead entry
-            TotalEcoWeight = math.max(0, TotalEcoWeight - data.weight)
+            TotalEcoWeight = math.max(0, TotalEcoWeight - (data.weight or 0))
             TargetRegistry[entityId] = nil
         end
     end
 
+    if bestTarget then
+        -- Add slight random scatter to prevent exact point stack-up
+        local sx = bestTarget[1] + math.random(-15, 15)
+        local sz = bestTarget[3] + math.random(-15, 15)
+        local sy = GetSurfaceHeight(sx, sz)
+        return Vector(sx, sy, sz)
+    end
+
     return GetFallbackEnemyTarget(raptorArmy)
+end
+
+---Backward-compatible wrapper for GetWeightedEnemyTarget
+---@param raptorArmy number
+---@param originPos Vector3|nil
+---@return Vector3|nil
+function GetWeightedRandomEnemyTarget(raptorArmy, originPos)
+    return GetWeightedEnemyTarget(raptorArmy, originPos)
 end
 
 ---Fallback targeting if no economy structures are currently registered
 ---@param raptorArmy number
 ---@return Vector3|nil
 function GetFallbackEnemyTarget(raptorArmy)
-    local allUnits = GetUnitsInRect(Rect(0, 0, ScenarioInfo.size[1], ScenarioInfo.size[2])) or {}
+    local mapW = (ScenarioInfo and ScenarioInfo.size and ScenarioInfo.size[1]) or 1024
+    local mapH = (ScenarioInfo and ScenarioInfo.size and ScenarioInfo.size[2]) or 1024
+    local allUnits = GetUnitsInRect(Rect(0, 0, mapW, mapH)) or {}
     for _, u in allUnits do
         if u and not u.Dead and (not raptorArmy or u:GetArmy() ~= raptorArmy) then
             local bp = u:GetBlueprint()
@@ -185,7 +230,7 @@ function GetFallbackEnemyTarget(raptorArmy)
         end
     end
     -- Ultimate fallback: Center of map
-    local mx = ScenarioInfo.size[1] * 0.5
-    local mz = ScenarioInfo.size[2] * 0.5
+    local mx = mapW * 0.5
+    local mz = mapH * 0.5
     return Vector(mx, GetSurfaceHeight(mx, mz), mz)
 end

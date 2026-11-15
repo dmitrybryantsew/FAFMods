@@ -27,6 +27,8 @@ RaptorUnitMixin = {
 
     OnDamage = function(self, instigator, amount, vector, damageType)
         local amt = amount
+        self.LastDamagedTime = GetGameTimeSeconds()
+
         -- 1. Master Overhaul outbound damage multiplier (applied if attacker is a buffed Raptor)
         if instigator and instigator.RaptorTotalDmgMult and instigator.RaptorTotalDmgMult ~= 1.0 and amt > 0 then
             amt = amt * instigator.RaptorTotalDmgMult
@@ -40,6 +42,9 @@ RaptorUnitMixin = {
             -- Berserk reaction for Assault Behemoths
             if cats['BERSERK'] and not self.IsBerserk then
                 PlatoonAI.TriggerBerserkCharge(self, instigator)
+            -- Skirmish backpedal for ranged spikers and bio-artillery
+            elseif cats['SKIRMISH'] and not self.IsKiting then
+                PlatoonAI.TriggerSkirmishKite(self, instigator:GetPosition())
             -- Coward retreat for light swarmers
             elseif cats['COWARD'] and (self:GetHealth() / self:GetMaxHealth()) < 0.80 then
                 PlatoonAI.TriggerCowardFlee(self, instigator)

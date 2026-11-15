@@ -12,15 +12,5 @@ AI = {
             key = 'raptorswarm',
             name = "AI: Raptor Swarm",
         },
-        {
-            key = 'raptorqueen',
-            name = "AI: Raptor Matriarch",
-        },
-    },
-    CheatAIList = {
-        {
-            key = 'raptorswarmcheat',
-            name = "AIx: Raptor Swarm (Cheating)",
-        },
     },
 }

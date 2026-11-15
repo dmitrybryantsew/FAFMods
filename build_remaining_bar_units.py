@@ -286,7 +286,7 @@ def calc_xact_crc(data):
         crc = (crc >> 8) ^ CRC16_TABLE[idx]
     return (~crc) & 0xFFFF
 
-def build_xact_bank(soundbank_name, wavebank_name, cue_name, wav_bytes):
+def build_xact_bank(soundbank_name, wavebank_name, cue_name, wav_bytes, cat_id=6):
     with wave.open(io.BytesIO(wav_bytes), 'rb') as w:
         wav_pcm = w.readframes(w.getnframes())
         num_samples = w.getnframes()
@@ -326,6 +326,7 @@ def build_xact_bank(soundbank_name, wavebank_name, cue_name, wav_bytes):
     sb_name_64 = soundbank_name.encode('ascii')[:63].ljust(64, b'\x00')
     sb[0x4a : 0x4a + 64] = sb_name_64
     sb[0x8a : 0x8a + 64] = wb_name_64
+    struct.pack_into('<H', sb, 203, cat_id)
     sb[229] = 0  # loopCount = 0 (one-shot)
     for i in range(16):
         struct.pack_into('<H', sb, 239 + i*2, 0)
@@ -403,7 +404,6 @@ bp_brood_egg = """ProjectileBlueprint {
     },
     Physics = {
         DestroyOnWater = true,
-        InitialSpeed = 0,
         Lifetime = 10,
         MaxSpeed = 30,
         RealisticOrdinance = true,
@@ -777,7 +777,7 @@ bp_pyro = """ProjectileBlueprint {
     Audio = {
         Impact = Sound {
             Bank = 'Impacts',
-            Cue = 'Cybran_Expl_Med_Impact',
+            Cue = 'CYB_Expl_Med_Impact',
             LodCutoff = 'Weapon_LodCutoff',
         },
     },
@@ -871,7 +871,7 @@ bp_neuro = """ProjectileBlueprint {
     Audio = {
         Impact = Sound {
             Bank = 'Impacts',
-            Cue = 'Cybran_Expl_Med_Impact',
+            Cue = 'CYB_Expl_Med_Impact',
             LodCutoff = 'Weapon_LodCutoff',
         },
     },
@@ -1421,13 +1421,14 @@ bp_xra0111 = """UnitBlueprint {
         BankFactor = 1.5,
         CanFly = true,
         CombatTurnSpeed = 2.0,
-        KMove = 1.5,
+        KMove = 1.6,
         KTurn = 2.0,
         LiftFactor = 12,
-        MaxAirspeed = 18.0,
-        MinAirspeed = 12.0,
+        MaxAirspeed = 28.0,
+        MinAirspeed = 24.0,
         StartTurnDistance = 5,
         TurnSpeed = 2.5,
+        EnableVisionWhileFalling = true,
     },
     Audio = {
         Destroyed = Sound {
@@ -1458,6 +1459,8 @@ bp_xra0111 = """UnitBlueprint {
         'VISIBLETORECON',
         'RECLAIMABLE',
         'OVERLAYRADAR',
+        'OVERLAYOMNI',
+        'OVERLAYSONAR',
     },
     CollisionOffsetY = 0,
     Defense = {
@@ -1468,6 +1471,11 @@ bp_xra0111 = """UnitBlueprint {
     },
     Description = '<LOC xra0111_desc>High-Speed Biological Air Scout',
     Display = {
+        Abilities = {
+            '<LOC ability_omni>Omni Sensor',
+            '<LOC ability_radar>Radar',
+            '<LOC ability_sonar>Sonar',
+        },
         Mesh = {
             IconFadeInZoom = 130,
             LODs = {
@@ -1511,8 +1519,10 @@ bp_xra0111 = """UnitBlueprint {
         UnitName = '<LOC xra0111_name>Bio-Recon Scout',
     },
     Intel = {
-        RadarRadius = 60,
-        VisionRadius = 45,
+        OmniRadius = 28,
+        RadarRadius = 100,
+        SonarRadius = 96,
+        VisionRadius = 64,
     },
     Interface = {
         HelpText = '<LOC xra0111_help>Blindingly fast winged raptor with acute bio-sonar senses for broad battlefield reconnaissance.',
@@ -1525,8 +1535,8 @@ bp_xra0111 = """UnitBlueprint {
         BuildOnLayerCaps = {
             LAYER_Air = true,
         },
-        Elevation = 14.0,
-        MaxSpeed = 18.0,
+        Elevation = 18.0,
+        MaxSpeed = 28.0,
         MotionType = 'RULEUMT_Air',
     },
     SelectionSizeX = 0.85,
@@ -1892,18 +1902,31 @@ shutil.copyfile(os.path.join(dir_xra0104, "XRA0104_Adeath01.sca"), os.path.join(
 bp_xra0204 = """UnitBlueprint {
     Air = {
         AutoLandTime = 1,
-        BankFactor = 2.0,
-        BreakOffDistance = 35,
+        BankFactor = 3,
+        BankForward = false,
+        BreakOffDistance = 36,
+        BreakOffIfNearNewTarget = true,
         BreakOffTrigger = 20,
         CanFly = true,
-        CombatTurnSpeed = 1.6,
+        CombatTurnSpeed = 1.5,
+        EngageDistance = 50,
+        KLift = 3,
+        KLiftDamping = 2.5,
         KMove = 1,
-        KTurn = 1,
+        KMoveDamping = 2,
+        KRoll = 2,
+        KRollDamping = 2,
+        KTurn = 0.8,
+        KTurnDamping = 1,
         LiftFactor = 10,
-        MaxAirspeed = 10.5,
-        MinAirspeed = 7.5,
-        StartTurnDistance = 10,
-        TurnSpeed = 1.6,
+        MaxAirspeed = 12,
+        MinAirspeed = 12,
+        PredictAheadForBombDrop = 3,
+        RandomBreakOffDistanceMult = 1.5,
+        StartTurnDistance = 1.4,
+        TightTurnMultiplier = 0,
+        TurnSpeed = 1.5,
+        Winged = true,
     },
     Audio = {
         Destroyed = Sound {
@@ -2000,8 +2023,8 @@ bp_xra0204 = """UnitBlueprint {
         BuildOnLayerCaps = {
             LAYER_Air = true,
         },
-        Elevation = 10.5,
-        MaxSpeed = 10.5,
+        Elevation = 15.0,
+        MaxSpeed = 0.5,
         MotionType = 'RULEUMT_Air',
     },
     SelectionSizeX = 1.8,
@@ -2017,7 +2040,7 @@ bp_xra0204 = """UnitBlueprint {
             AboveWaterTargetsOnly = true,
             AutoInitiateAttackCommand = true,
             BallisticArc = 'RULEUBA_None',
-            BombDropThreshold = 3,
+            BombDropThreshold = 3.5,
             Damage = 150,
             DamageRadius = 3.0,
             DamageType = 'Normal',
@@ -2025,8 +2048,9 @@ bp_xra0204 = """UnitBlueprint {
             FireTargetLayerCapsTable = {
                 Air = 'Land|Water|Seabed',
             },
-            FiringRandomness = 0.5,
-            FiringTolerance = 3,
+            FiringRandomness = 0.05,
+            FiringTolerance = 6,
+            FixBombTrajectory = true,
             Label = 'Bomb',
             MaxRadius = 45,
             MuzzleSalvoDelay = 0.2,
@@ -2059,6 +2083,7 @@ bp_xra0204 = """UnitBlueprint {
                 'ALLUNITS',
             },
             TargetRestrictDisallow = 'UNTARGETABLE',
+            TrackingRadius = 1.25,
             Turreted = false,
             WeaponCategory = 'Bomb',
             Audio = {

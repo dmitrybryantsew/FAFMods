@@ -147,10 +147,179 @@ def load_processed_units():
             "weaponMuzzleVel": weapon_muzzle_vel,
         })
 
+    # Also include Raptor Swarm faction units if available
+    raptor_file = BASE_DIR / "data" / "raptor_units.json"
+    if raptor_file.exists():
+        try:
+            with open(raptor_file, "r", encoding="utf-8") as f:
+                raptor_dict = json.load(f)
+            for r in raptor_dict.values():
+                s = r.get("stats", {})
+                weps = r.get("weapons", [])
+                first_wep = weps[0] if weps else {}
+                processed.append({
+                    "id": r.get("id"),
+                    "name": f"{r.get('name')} ({r.get('description')})",
+                    "unitName": r.get("name", ""),
+                    "desc": r.get("description", ""),
+                    "faction": "Raptor",
+                    "tech": r.get("tech", "T1"),
+                    "type": r.get("type", "LAND"),
+                    "role": r.get("role", ""),
+                    "categories": r.get("categories", []),
+                    "hp": s.get("health", 0),
+                    "regen": s.get("regen", 0),
+                    "shield": 0,
+                    "shieldRegen": 0,
+                    "hasShield": False,
+                    "mass": s.get("mass", 0),
+                    "energy": s.get("energy", 0),
+                    "buildTime": s.get("buildTime", 0),
+                    "buildRate": s.get("buildRate", 0),
+                    "massProd": s.get("massProd", 0),
+                    "energyProd": s.get("energyProd", 0),
+                    "hasEcoProd": (s.get("massProd", 0) > 0 or s.get("energyProd", 0) > 0),
+                    "speed": s.get("speed", 0),
+                    "turnRate": s.get("turnRate", 0),
+                    "vision": s.get("vision", 0),
+                    "radar": s.get("radar", 0) or s.get("sonar", 0) or s.get("omni", 0),
+                    "hasRadar": (s.get("radar", 0) > 0 or s.get("omni", 0) > 0),
+                    "hasWeapons": len(weps) > 0,
+                    "weaponName": first_wep.get("name", ""),
+                    "weaponDamage": first_wep.get("damage", 0),
+                    "weaponRof": first_wep.get("rateOfFire", 0),
+                    "weaponRange": first_wep.get("rangeMax", 0),
+                    "weaponAoe": first_wep.get("damageRadius", 0),
+                    "weaponMuzzleVel": first_wep.get("muzzleVelocity", 0),
+                    "icon": r.get("icon", f"/static/img/units/{r.get('id', '').lower()}.png"),
+                    "abilities": r.get("abilities", []),
+                    "veterancy": r.get("veterancy", []),
+                    "weapons": weps,
+                    "stats": s
+                })
+        except Exception as e:
+            print(f"[Warning] Could not load raptor_units.json: {e}")
+
     return processed
 
 
 PROCESSED_UNITS = load_processed_units()
+
+
+def get_all_unitdb_units():
+    """Returns combined unit database catalog with full stats for both FAF and Raptor units."""
+    result = []
+    # 1. Raptor units
+    raptor_file = BASE_DIR / "data" / "raptor_units.json"
+    if raptor_file.exists():
+        try:
+            with open(raptor_file, "r", encoding="utf-8") as f:
+                raptor_dict = json.load(f)
+                result.extend(list(raptor_dict.values()))
+        except Exception:
+            pass
+
+    # 2. Standard FAF units
+    if DATA_FILE.exists():
+        try:
+            with open(DATA_FILE, "r", encoding="utf-8") as f:
+                raw_faf = json.load(f).get("units", [])
+            for u in raw_faf:
+                uid = u.get("Id", "")
+                cats = u.get("Categories", []) or []
+                gen = u.get("General", {}) or {}
+                econ = u.get("Economy", {}) or {}
+                defense = u.get("Defense", {}) or {}
+                phys = u.get("Physics", {}) or {}
+                intel = u.get("Intel", {}) or {}
+                weapons_raw = u.get("Weapon", []) or []
+
+                tech = "OTHER"
+                if "TECH1" in cats: tech = "T1"
+                elif "TECH2" in cats: tech = "T2"
+                elif "TECH3" in cats: tech = "T3"
+                elif "EXPERIMENTAL" in cats: tech = "EXP"
+
+                utype = "OTHER"
+                if "LAND" in cats: utype = "LAND"
+                elif "AIR" in cats: utype = "AIR"
+                elif "NAVAL" in cats: utype = "NAVAL"
+                elif "DEFENSE" in cats: utype = "DEFENSE"
+                elif "STRUCTURE" in cats: utype = "STRUCTURE"
+                elif "COMMAND" in cats: utype = "COMMAND"
+
+                name = gen.get("UnitName") or u.get("Description", uid)
+                desc = u.get("Description", "")
+
+                norm_weps = []
+                for w in weapons_raw:
+                    d = w.get("Damage", 0) or w.get("NukeInnerRingDamage", 0)
+                    rof = round(w.get("RateOfFire", 0), 2)
+                    dps = round(d * rof, 1)
+                    cycle_sec = round(1.0 / rof, 2) if rof > 0 else 0
+                    norm_weps.append({
+                        "name": w.get("DisplayName", w.get("Label", "Weapon")),
+                        "category": w.get("WeaponCategory", "Direct Fire"),
+                        "type": f"{w.get('WeaponCategory', 'Direct Fire')} ({w.get('DamageType', 'Normal')})",
+                        "damage": d,
+                        "rateOfFire": rof,
+                        "dps": dps,
+                        "rangeStr": f"0 - {w.get('MaxRadius', 0)}",
+                        "rangeMax": w.get("MaxRadius", 0),
+                        "muzzleVelocity": w.get("MuzzleVelocity", 0),
+                        "fireCycle": f"1 shot / {cycle_sec} sec",
+                        "turretPitch": f"0-{w.get('TurretPitchRange', 0)}° @ {w.get('TurretPitchSpeed', 0)}°/s",
+                        "turretYaw": f"0-{w.get('TurretYawRange', 0)}° @ {w.get('TurretYawSpeed', 0)}°/s",
+                        "firingTolerance": w.get("FiringTolerance", 0),
+                        "damageRadius": w.get("DamageRadius", 0)
+                    })
+
+                disp = u.get("Display", {}) or {}
+                abilities = [ab.replace("<LOC ability_", "").replace(">", "").strip() for ab in disp.get("Abilities", []) or []]
+
+                result.append({
+                    "id": uid,
+                    "id_lower": uid.lower(),
+                    "name": name,
+                    "description": desc,
+                    "faction": gen.get("FactionName", "Unknown"),
+                    "tech": tech,
+                    "type": utype,
+                    "role": desc or name,
+                    "categories": cats,
+                    "icon": f"/static/img/units/{uid.lower()}.png",
+                    "stats": {
+                        "health": defense.get("Health", 0),
+                        "maxHealth": defense.get("Health", 0),
+                        "regen": defense.get("RegenRate", 0),
+                        "armorType": defense.get("ArmorType", "Normal"),
+                        "mass": econ.get("BuildCostMass", 0),
+                        "energy": econ.get("BuildCostEnergy", 0),
+                        "buildTime": econ.get("BuildTime", 0),
+                        "buildRate": econ.get("BuildRate", 0),
+                        "massProd": econ.get("ProductionPerSecondMass", 0),
+                        "energyProd": econ.get("ProductionPerSecondEnergy", 0),
+                        "speed": round(phys.get("MaxSpeed", 0), 2),
+                        "turnRate": round(phys.get("TurnRate", 0), 1),
+                        "motionType": phys.get("MotionType", "RULEUMT_None"),
+                        "vision": intel.get("VisionRadius", 0),
+                        "waterVision": intel.get("WaterVisionRadius", intel.get("VisionRadius", 0)),
+                        "radar": intel.get("RadarRadius", 0),
+                        "sonar": intel.get("SonarRadius", 0),
+                        "omni": intel.get("OmniRadius", 0),
+                        "totalDps": sum(w["dps"] for w in norm_weps if w["category"] != "Death"),
+                        "wreckageHealth": round(defense.get("Health", 0) * 0.9),
+                        "wreckageMass": round(econ.get("BuildCostMass", 0) * 0.81)
+                    },
+                    "abilities": abilities,
+                    "veterancy": [],
+                    "weapons": norm_weps
+                })
+        except Exception as e:
+            print(f"[Warning] Error assembling FAF units in get_all_unitdb_units: {e}")
+
+    return result
+
 
 
 def generate_ui_unitview_detail_lua(unit_table_lua, target_mode, player_name):
@@ -5905,12 +6074,60 @@ class ModForgeHandler(http.server.SimpleHTTPRequestHandler):
             with open(TEMPLATES_DIR / "lootbox.html", "rb") as f:
                 self.wfile.write(f.read())
             return
-        elif parsed.path in ("/animator", "/animator.html", "/preview", "/raptor"):
+        elif parsed.path in ("/animator", "/animator.html", "/preview"):
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
             with open(TEMPLATES_DIR / "animator.html", "rb") as f:
                 self.wfile.write(f.read())
+            return
+        elif parsed.path in ("/unitdb", "/unitdb.html", "/roster", "/raptors", "/raptor"):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.end_headers()
+            with open(TEMPLATES_DIR / "unitdb.html", "rb") as f:
+                self.wfile.write(f.read())
+            return
+        elif parsed.path in ("/api/raptors", "/api/raptor-roster"):
+            query = urllib.parse.parse_qs(parsed.query)
+            tier = query.get("tier", [None])[0]
+            utype = query.get("type", [None])[0]
+            fmt = query.get("format", ["json"])[0]
+            from raptor_roster import get_raptor_roster, get_raptor_roster_summary
+            if fmt == "summary":
+                res = get_raptor_roster_summary(tier=tier)
+                self.send_response(200)
+                self.send_header("Content-Type", "text/markdown; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(res.encode("utf-8"))
+            else:
+                res = get_raptor_roster(tier=tier, utype=utype, as_dict=False)
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(json.dumps(res).encode("utf-8"))
+            return
+        elif parsed.path.startswith("/api/raptors/"):
+            uid = parsed.path.split("/")[-1].upper()
+            from raptor_roster import get_raptor_unit
+            unit = get_raptor_unit(uid)
+            if unit:
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(json.dumps(unit).encode("utf-8"))
+            else:
+                self.send_response(404)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": f"Unit {uid} not found"}).encode("utf-8"))
+            return
+        elif parsed.path == "/api/unitdb":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.end_headers()
+            all_db = get_all_unitdb_units()
+            self.wfile.write(json.dumps(all_db).encode("utf-8"))
             return
         elif parsed.path == "/api/units":
             self.send_response(200)
@@ -5929,6 +6146,10 @@ class ModForgeHandler(http.server.SimpleHTTPRequestHandler):
                     self.send_header("Content-Type", "application/javascript; charset=utf-8")
                 elif local_file.suffix == ".png":
                     self.send_header("Content-Type", "image/png")
+                elif local_file.suffix in (".jpg", ".jpeg"):
+                    self.send_header("Content-Type", "image/jpeg")
+                elif local_file.suffix == ".svg":
+                    self.send_header("Content-Type", "image/svg+xml")
                 elif local_file.suffix == ".json":
                     self.send_header("Content-Type", "application/json")
                 elif local_file.suffix == ".wav":

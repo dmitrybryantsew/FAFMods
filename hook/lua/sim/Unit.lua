@@ -28,10 +28,30 @@ Unit = Class(OldUnit) {
 
     OnDamage = function(self, instigator, amount, vector, damageType)
         local amt = amount
+        self.LastDamagedTime = GetGameTimeSeconds()
         -- FAF Master Overhaul outbound damage multiplier integration
         if instigator and instigator.RaptorTotalDmgMult and instigator.RaptorTotalDmgMult ~= 1.0 and amt > 0 then
             amt = amt * instigator.RaptorTotalDmgMult
         end
+
+        -- Behavioral Reactions on Taking Damage for all biological Raptors
+        if not self.Dead and instigator and not instigator.Dead then
+            local bp = self:GetBlueprint()
+            local cats = bp.CategoriesHash or {}
+            if cats['RAPTOR'] then
+                local PlatoonAI = import('/mods/RaptorFaction/lua/RaptorPlatoonAI.lua')
+                if cats['BERSERK'] and not self.IsBerserk then
+                    PlatoonAI.TriggerBerserkCharge(self, instigator)
+                elseif cats['SKIRMISH'] and not self.IsKiting then
+                    PlatoonAI.TriggerSkirmishKite(self, instigator:GetPosition())
+                elseif cats['COWARD'] and (self:GetHealth() / self:GetMaxHealth()) < 0.80 then
+                    PlatoonAI.TriggerCowardFlee(self, instigator)
+                elseif cats['SPECTRE'] then
+                    PlatoonAI.TriggerSpectreBlink(self, instigator:GetPosition())
+                end
+            end
+        end
+
         return OldUnit.OnDamage(self, instigator, amt, vector, damageType)
     end,
 

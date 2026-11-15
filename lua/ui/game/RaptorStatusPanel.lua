@@ -34,6 +34,7 @@ local Strings = {
         QueensKilled = "Убито Королев: %d",
         ToggleTip = "Клик: Свернуть / Развернуть HUD",
         LangTip = "Клик: Переключить язык (RU/EN)",
+        CreepInfo = "Крип: %.0f%% (Мексы: %d)",
         Difficulties = {
             veryeasy = "Очень легкая",
             easy     = "Легкая",
@@ -54,6 +55,7 @@ local Strings = {
         QueensKilled = "Queens Slain: %d",
         ToggleTip = "Click: Collapse / Expand HUD",
         LangTip = "Click: Toggle Language (RU/EN)",
+        CreepInfo = "Creep: %.0f%% (Mexes: %d)",
         Difficulties = {
             veryeasy = "Very Easy",
             easy     = "Easy",
@@ -141,8 +143,14 @@ function UpdateData(data)
     -- 2. KILL COUNT
     controls.lblKills:SetText(string.format(dict.Kills, data.Kills or 0))
 
-    -- 3. DIFFICULTY MODE
-    controls.lblMode:SetText(string.format(dict.Mode, diffName))
+    -- 3. DIFFICULTY MODE & CREEP TERRITORY
+    local modeStr = string.format(dict.Mode, diffName)
+    if data.CreepCoverage then
+        local creepStr = string.format(dict.CreepInfo, data.CreepCoverage or 0, data.InfestedMexes or 0)
+        controls.lblMode:SetText(modeStr .. " | " .. creepStr)
+    else
+        controls.lblMode:SetText(modeStr)
+    end
 end
 
 ---Receives telemetry directly from UserSync hook
@@ -151,6 +159,22 @@ function ReceiveData(data)
     if not data then return end
     lastData = data
     hasEverReceivedData = true
+
+    if data.RaptorArmy and data.HivemindName then
+        local armies = GetArmiesTable()
+        if armies and armies.armiesTable and armies.armiesTable[data.RaptorArmy] then
+            armies.armiesTable[data.RaptorArmy].nickname = data.HivemindName
+            local Factions = import('/lua/factions.lua').Factions
+            if Factions then
+                for idx, f in Factions do
+                    if f.Key == 'raptor' then
+                        armies.armiesTable[data.RaptorArmy].faction = idx - 1
+                        break
+                    end
+                end
+            end
+        end
+    end
 
     if data.Active then
         if not isCollapsed then

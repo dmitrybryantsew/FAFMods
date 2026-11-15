@@ -25,9 +25,10 @@ dir_xra0106 = os.path.join(units_root, "XRA0106") # Spore AA Spire
 dir_xra0208 = os.path.join(units_root, "XRA0208") # Burrowing Worm
 
 dir_proj_spore = os.path.join(proj_root, "XRA_Spore01")
+dir_proj_biospore = os.path.join(proj_root, "XRA_BioSpore01")
 dir_proj_mortar = os.path.join(proj_root, "XRA_BioMortar01")
 
-for d in [icons_dir, dir_xra0107, dir_xra0108, dir_xra0106, dir_xra0208, dir_proj_spore, dir_proj_mortar, raptor_sounds_dir]:
+for d in [icons_dir, dir_xra0107, dir_xra0108, dir_xra0106, dir_xra0208, dir_proj_spore, dir_proj_biospore, dir_proj_mortar, raptor_sounds_dir]:
     os.makedirs(d, exist_ok=True)
 
 # ---------------------------------------------------------------------------
@@ -267,7 +268,7 @@ def calc_xact_crc(data):
         crc = (crc >> 8) ^ CRC16_TABLE[idx]
     return (~crc) & 0xFFFF
 
-def build_xact_bank(soundbank_name, wavebank_name, cue_name, wav_bytes):
+def build_xact_bank(soundbank_name, wavebank_name, cue_name, wav_bytes, cat_id=6):
     with wave.open(io.BytesIO(wav_bytes), 'rb') as w:
         wav_pcm = w.readframes(w.getnframes())
         num_samples = w.getnframes()
@@ -307,6 +308,7 @@ def build_xact_bank(soundbank_name, wavebank_name, cue_name, wav_bytes):
     sb_name_64 = soundbank_name.encode('ascii')[:63].ljust(64, b'\x00')
     sb[0x4a : 0x4a + 64] = sb_name_64
     sb[0x8a : 0x8a + 64] = wb_name_64
+    struct.pack_into('<H', sb, 203, cat_id)
     sb[229] = 0  # loopCount = 0 (one-shot)
     for i in range(16):
         struct.pack_into('<H', sb, 239 + i*2, 0)
@@ -516,16 +518,26 @@ bp_hive_content = """UnitBlueprint {
     },
     Audio = {
         Construct = Sound {
-            Bank = 'Raptor_Attack',
-            Cue = 'Attack',
+            Bank = 'URB',
+            Cue = 'URB0101_Construct_Start',
+            LodCutoff = 'UnitMove_LodCutoff',
+        },
+        ConstructLoop = Sound {
+            Bank = 'URB',
+            Cue = 'URB0101_Construct_Loop',
+            LodCutoff = 'UnitMove_LodCutoff',
+        },
+        DoneBeingBuilt = Sound {
+            Bank = 'URB',
+            Cue = 'URB0101_Activate',
+            LodCutoff = 'UnitMove_LodCutoff',
+        },
+        UISelection = Sound {
+            Bank = 'Interface',
+            Cue = 'Cybran_Select_Factory',
             LodCutoff = 'UnitMove_LodCutoff',
         },
         Destroyed = Sound {
-            Bank = 'Raptor_Roost_Death',
-            Cue = 'Death',
-            LodCutoff = 'UnitMove_LodCutoff',
-        },
-        Killed = Sound {
             Bank = 'Raptor_Roost_Death',
             Cue = 'Death',
             LodCutoff = 'UnitMove_LodCutoff',
@@ -1215,7 +1227,17 @@ proj_spore_bp = """ProjectileBlueprint {
     Audio = {
         Impact = Sound {
             Bank = 'Impacts',
-            Cue = 'X_Impact_Land_Gen_Seraphim',
+            Cue = 'Impact_Water_Splash_AEON',
+            LodCutoff = 'Weapon_LodCutoff',
+        },
+        ImpactTerrain = Sound {
+            Bank = 'Impacts',
+            Cue = 'Impact_Land_Gen_Cybran',
+            LodCutoff = 'Weapon_LodCutoff',
+        },
+        ImpactWater = Sound {
+            Bank = 'Impacts',
+            Cue = 'Impact_Water_Splash_AEON',
             LodCutoff = 'Weapon_LodCutoff',
         },
     },
@@ -1225,21 +1247,25 @@ proj_spore_bp = """ProjectileBlueprint {
         'ANTIAIR',
     },
     Display = {
+        CameraFollowTimeout = 2,
+        CameraFollowsProjectile = false,
         ImpactEffects = {
-            Type = 'Small01',
+            Type = 'Medium02',
         },
         Mesh = {
             LODs = {
                 {
-                    AlbedoName = '/mods/RaptorFaction/units/XRA0106/XRA0106_Albedo.dds',
-                    LODCutoff = 150,
-                    MeshName = '/mods/RaptorFaction/projectiles/XRA_Spike01/XRA_Spike01_lod0.scm',
-                    ShaderName = 'TMeshNoLighting',
+                    AlbedoName = '/mods/RaptorFaction/projectiles/XRA_Spore01/XRA_Spore01_Albedo.dds',
+                    LODCutoff = 180,
+                    MeshName = '/mods/RaptorFaction/projectiles/XRA_Spore01/XRA_Spore01_lod0.scm',
+                    NormalsName = '/mods/RaptorFaction/units/XRA0101/XRA0101_NormalsTS.dds',
+                    SpecularName = '/mods/RaptorFaction/units/XRA0101/XRA0101_SpecTeam.dds',
+                    ShaderName = 'Insect',
                 },
             },
         },
         StrategicIconSize = 1,
-        UniformScale = 3.0,
+        UniformScale = 0.55,
     },
     General = {
         Category = 'Anti Air',
@@ -1248,23 +1274,24 @@ proj_spore_bp = """ProjectileBlueprint {
             'PROJECTILE',
             'ANTIAIR',
         },
-        Faction = 'Cybran',
-        Weapon = 'Bio Spore Flak',
+        Faction = 'Raptor',
+        Weapon = 'Guided Bio-Spore',
     },
     Interface = {
         HelpText = 0,
     },
     Physics = {
-        Acceleration = 8,
+        Acceleration = 25,
         DestroyOnWater = true,
-        InitialSpeed = 25,
-        Lifetime = 3.5,
-        MaxSpeed = 45,
-        RotationalVelocity = 400,
-        RotationalVelocityRange = 200,
+        InitialSpeed = 32,
+        LeadTarget = false,
+        Lifetime = 6.0,
+        MaxSpeed = 60,
+        OnLostTargetLifetime = 0.7,
+        RotationalVelocity = 360,
+        RotationalVelocityRange = 180,
         TrackTarget = true,
-        TrackingRadius = 1.4,
-        TurnRate = 360,
+        TurnRate = 540,
         UseGravity = false,
         VelocityAlign = true,
     },
@@ -1274,11 +1301,48 @@ proj_spore_bp = """ProjectileBlueprint {
 with open(os.path.join(dir_proj_spore, "XRA_Spore01_proj.bp"), "w") as f:
     f.write(proj_spore_bp)
 
-proj_spore_script = """local SinglePolyTrailProjectile = import('/lua/sim/defaultprojectiles.lua').SinglePolyTrailProjectile
+proj_spore_script = """local SingleCompositeEmitterProjectile = import('/lua/sim/defaultprojectiles.lua').SingleCompositeEmitterProjectile
 
-XRA_Spore01 = Class(SinglePolyTrailProjectile) {
-    PolyTrail = '/effects/emitters/seraphim_aireau_autocannon_polytrail_01_emit.bp',
+XRA_Spore01 = Class(SingleCompositeEmitterProjectile) {
+    PolyTrail = '/mods/RaptorFaction/effects/emitters/raptor_spore_polytrail_01_emit.bp',
     PolyTrailOffset = 0,
+
+    FxTrails = {
+        '/mods/RaptorFaction/effects/emitters/raptor_creep_spores_01_emit.bp',
+        '/mods/RaptorFaction/effects/emitters/raptor_acid_steam_01_emit.bp',
+    },
+
+    FxImpactUnit = {
+        '/mods/RaptorFaction/effects/emitters/raptor_blood_cloud_01_emit.bp',
+        '/mods/RaptorFaction/effects/emitters/raptor_blood_spray_01_emit.bp',
+        '/mods/RaptorFaction/effects/emitters/raptor_acid_splash_01_emit.bp',
+    },
+
+    FxImpactAirUnit = {
+        '/mods/RaptorFaction/effects/emitters/raptor_blood_cloud_01_emit.bp',
+        '/mods/RaptorFaction/effects/emitters/raptor_blood_spray_01_emit.bp',
+        '/mods/RaptorFaction/effects/emitters/raptor_flesh_chunks_01_emit.bp',
+    },
+
+    FxImpactLand = {
+        '/mods/RaptorFaction/effects/emitters/raptor_blood_cloud_01_emit.bp',
+        '/mods/RaptorFaction/effects/emitters/raptor_acid_splash_01_emit.bp',
+    },
+
+    FxImpactWater = {
+        '/mods/RaptorFaction/effects/emitters/raptor_blood_cloud_01_emit.bp',
+        '/mods/RaptorFaction/effects/emitters/raptor_acid_splash_01_emit.bp',
+    },
+
+    FxImpactProp = {
+        '/mods/RaptorFaction/effects/emitters/raptor_blood_cloud_01_emit.bp',
+        '/mods/RaptorFaction/effects/emitters/raptor_acid_splash_01_emit.bp',
+    },
+
+    FxImpactShield = {
+        '/mods/RaptorFaction/effects/emitters/raptor_blood_cloud_01_emit.bp',
+        '/mods/RaptorFaction/effects/emitters/raptor_acid_bubbles_01_emit.bp',
+    },
 }
 
 TypeClass = XRA_Spore01
@@ -1286,6 +1350,135 @@ TypeClass = XRA_Spore01
 
 with open(os.path.join(dir_proj_spore, "XRA_Spore01_script.lua"), "w") as f:
     f.write(proj_spore_script)
+
+# Projectile: XRA_BioSpore01 (Heavy Dorsal Volley Spores)
+proj_biospore_bp = """ProjectileBlueprint {
+    Audio = {
+        Impact = Sound {
+            Bank = 'Impacts',
+            Cue = 'Impact_Water_Splash_AEON',
+            LodCutoff = 'Weapon_LodCutoff',
+        },
+        ImpactTerrain = Sound {
+            Bank = 'Impacts',
+            Cue = 'Impact_Land_Gen_Cybran',
+            LodCutoff = 'Weapon_LodCutoff',
+        },
+        ImpactWater = Sound {
+            Bank = 'Impacts',
+            Cue = 'Impact_Water_Splash_AEON',
+            LodCutoff = 'Weapon_LodCutoff',
+        },
+    },
+    Categories = {
+        'RAPTOR',
+        'PROJECTILE',
+        'ANTIAIR',
+    },
+    Display = {
+        CameraFollowTimeout = 2,
+        CameraFollowsProjectile = false,
+        ImpactEffects = {
+            Type = 'Medium02',
+        },
+        Mesh = {
+            LODs = {
+                {
+                    AlbedoName = '/mods/RaptorFaction/projectiles/XRA_Spore01/XRA_Spore01_Albedo.dds',
+                    LODCutoff = 200,
+                    MeshName = '/mods/RaptorFaction/projectiles/XRA_Spore01/XRA_Spore01_lod0.scm',
+                    NormalsName = '/mods/RaptorFaction/units/XRA0101/XRA0101_NormalsTS.dds',
+                    SpecularName = '/mods/RaptorFaction/units/XRA0101/XRA0101_SpecTeam.dds',
+                    ShaderName = 'Insect',
+                },
+            },
+        },
+        StrategicIconSize = 2,
+        UniformScale = 0.85,
+    },
+    General = {
+        Category = 'Anti Air',
+        EntityCategory = {
+            'RAPTOR',
+            'PROJECTILE',
+            'ANTIAIR',
+        },
+        Faction = 'Raptor',
+        Weapon = 'Heavy Dorsal Bio-Spore',
+    },
+    Interface = {
+        HelpText = 0,
+    },
+    Physics = {
+        Acceleration = 28,
+        DestroyOnWater = true,
+        InitialSpeed = 32,
+        LeadTarget = false,
+        Lifetime = 6.0,
+        MaxSpeed = 62,
+        OnLostTargetLifetime = 0.7,
+        RotationalVelocity = 360,
+        RotationalVelocityRange = 180,
+        TrackTarget = true,
+        TurnRate = 540,
+        UseGravity = false,
+        VelocityAlign = true,
+    },
+}
+"""
+
+with open(os.path.join(dir_proj_biospore, "XRA_BioSpore01_proj.bp"), "w") as f:
+    f.write(proj_biospore_bp)
+
+proj_biospore_script = """local SingleCompositeEmitterProjectile = import('/lua/sim/defaultprojectiles.lua').SingleCompositeEmitterProjectile
+
+XRA_BioSpore01 = Class(SingleCompositeEmitterProjectile) {
+    PolyTrail = '/mods/RaptorFaction/effects/emitters/raptor_spore_polytrail_01_emit.bp',
+    PolyTrailOffset = 0,
+
+    FxTrails = {
+        '/mods/RaptorFaction/effects/emitters/raptor_creep_spores_01_emit.bp',
+        '/mods/RaptorFaction/effects/emitters/raptor_acid_steam_01_emit.bp',
+    },
+
+    FxImpactUnit = {
+        '/mods/RaptorFaction/effects/emitters/raptor_blood_cloud_01_emit.bp',
+        '/mods/RaptorFaction/effects/emitters/raptor_blood_spray_01_emit.bp',
+        '/mods/RaptorFaction/effects/emitters/raptor_acid_splash_01_emit.bp',
+    },
+
+    FxImpactAirUnit = {
+        '/mods/RaptorFaction/effects/emitters/raptor_blood_cloud_01_emit.bp',
+        '/mods/RaptorFaction/effects/emitters/raptor_blood_spray_01_emit.bp',
+        '/mods/RaptorFaction/effects/emitters/raptor_flesh_chunks_01_emit.bp',
+    },
+
+    FxImpactLand = {
+        '/mods/RaptorFaction/effects/emitters/raptor_blood_cloud_01_emit.bp',
+        '/mods/RaptorFaction/effects/emitters/raptor_acid_splash_01_emit.bp',
+    },
+
+    FxImpactWater = {
+        '/mods/RaptorFaction/effects/emitters/raptor_blood_cloud_01_emit.bp',
+        '/mods/RaptorFaction/effects/emitters/raptor_acid_splash_01_emit.bp',
+    },
+
+    FxImpactProp = {
+        '/mods/RaptorFaction/effects/emitters/raptor_blood_cloud_01_emit.bp',
+        '/mods/RaptorFaction/effects/emitters/raptor_acid_splash_01_emit.bp',
+    },
+
+    FxImpactShield = {
+        '/mods/RaptorFaction/effects/emitters/raptor_blood_cloud_01_emit.bp',
+        '/mods/RaptorFaction/effects/emitters/raptor_acid_bubbles_01_emit.bp',
+    },
+}
+
+TypeClass = XRA_BioSpore01
+"""
+
+with open(os.path.join(dir_proj_biospore, "XRA_BioSpore01_script.lua"), "w") as f:
+    f.write(proj_biospore_script)
 
 # Blueprint: XRA0106_unit.bp
 bp_aa_content = """UnitBlueprint {

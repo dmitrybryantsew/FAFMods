@@ -1,0 +1,896 @@
+/* ==========================================================================
+   FAF Unit Database & Raptor Swarm Roster - CSS Stylesheet
+   Replicates the Supreme Commander: Forged Alliance Forever Unit Database
+   with dark grunge metal aesthetic, multi-faction grid, and side-by-side compare.
+   ========================================================================== */
+
+:root {
+  --bg-dark: #121315;
+  --bg-card: #18191c;
+  --bg-card-hover: #222428;
+  --bg-metal: #1f2024;
+  --border-grunge: #2e3036;
+  --border-highlight: #45474f;
+
+  --color-gold: #fda005;
+  --color-gold-bright: #ffb733;
+  --color-health: #22c55e;
+  --color-mass: #fbbf24;
+  --color-energy: #38bdf8;
+  --color-time: #a78bfa;
+  --color-dps: #f87171;
+
+  /* Faction Colors */
+  --faction-uef: #2d78b2;
+  --faction-uef-bg: rgba(45, 120, 178, 0.22);
+  --faction-cybran: #df2d0e;
+  --faction-cybran-bg: rgba(223, 45, 14, 0.22);
+  --faction-aeon: #0a9d2f;
+  --faction-aeon-bg: rgba(10, 157, 47, 0.22);
+  --faction-seraphim: #d4a017;
+  --faction-seraphim-bg: rgba(212, 160, 23, 0.22);
+  --faction-nomads: #e17d23;
+  --faction-nomads-bg: rgba(225, 125, 35, 0.22);
+  --faction-raptor: #ff4d00;
+  --faction-raptor-bg: rgba(255, 77, 0, 0.25);
+}
+
+body.unitdb-body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-dark);
+  background-image:
+    radial-gradient(circle at 50% 0%, rgba(255, 77, 0, 0.08) 0%, transparent 60%),
+    linear-gradient(rgba(18, 19, 21, 0.94), rgba(18, 19, 21, 0.94)),
+    url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23ffffff' fill-opacity='0.02' fill-rule='evenodd'/%3E%3C/svg%3E");
+  color: #e2e8f0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  overflow-x: hidden;
+}
+
+/* UnitDB Layout */
+.unitdb-layout {
+  display: flex;
+  min-height: calc(100vh - 72px);
+  position: relative;
+}
+
+.unitdb-content {
+  flex: 1;
+  padding: 12px 18px 40px 18px;
+  overflow-x: auto;
+}
+
+/* Right Fixed Sidebar */
+.unitdb-sidebar {
+  width: 260px;
+  background: rgba(22, 23, 26, 0.95);
+  border-left: 1px solid var(--border-grunge);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.5);
+  position: sticky;
+  top: 72px;
+  height: calc(100vh - 72px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  z-index: 50;
+}
+
+/* Compare Control Bar in Sidebar */
+.sidebar-compare-box {
+  background: #1c1d21;
+  border: 1px solid #33363f;
+  border-radius: 6px;
+  padding: 12px;
+  text-align: center;
+}
+
+.compare-count-text {
+  font-size: 13px;
+  color: #94a3b8;
+  margin-bottom: 8px;
+  font-family: 'Chakra Petch', sans-serif;
+}
+
+.compare-count-number {
+  color: var(--color-gold);
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.btn-compare-action {
+  width: 100%;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%);
+  color: #000;
+  font-family: 'Chakra Petch', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border: 1px solid #fbbf24;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-compare-action:hover:not(:disabled) {
+  background: linear-gradient(180deg, #fbbf24 0%, #f59e0b 100%);
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.5);
+  transform: translateY(-1px);
+}
+
+.btn-compare-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: grayscale(0.8);
+}
+
+.btn-clear-selection {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  font-size: 11px;
+  cursor: pointer;
+  margin-top: 6px;
+  text-decoration: underline;
+}
+
+.btn-clear-selection:hover {
+  color: #cbd5e1;
+}
+
+/* Sidebar Search */
+.sidebar-search input {
+  width: 100%;
+  padding: 9px 12px;
+  background: #0f1012;
+  border: 1px solid #2d3039;
+  border-radius: 4px;
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+.sidebar-search input:focus {
+  outline: none;
+  border-color: var(--color-gold);
+  box-shadow: 0 0 8px rgba(253, 160, 5, 0.3);
+}
+
+/* Sidebar Section Headers */
+.sidebar-section-title {
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #94a3b8;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Sidebar Filter Buttons */
+.sidebar-button-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: #18191d;
+  border: 1px solid #282a32;
+  border-radius: 4px;
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.filter-btn:hover {
+  background: #23252c;
+  color: #fff;
+  border-color: #3b3f4d;
+}
+
+.filter-btn.active {
+  background: rgba(253, 160, 5, 0.15);
+  border-color: var(--color-gold);
+  color: var(--color-gold-bright);
+  font-weight: 600;
+}
+
+.filter-btn.active.raptor {
+  background: rgba(255, 77, 0, 0.2);
+  border-color: var(--faction-raptor);
+  color: #ff7844;
+}
+
+.filter-icon {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.filter-count {
+  margin-left: auto;
+  font-size: 11px;
+  color: #64748b;
+  font-family: monospace;
+}
+
+/* Quick Presets Box */
+.sidebar-presets {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.preset-chip {
+  padding: 6px 8px;
+  font-size: 11px;
+  background: #141518;
+  border: 1px solid #282a33;
+  border-radius: 3px;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.preset-chip:hover {
+  background: #202228;
+  color: #fff;
+  border-color: #434857;
+}
+
+.preset-chip.highlight {
+  border-color: #ff5722;
+  color: #ff7844;
+  background: rgba(255, 87, 34, 0.1);
+  font-weight: 600;
+}
+
+/* View Switcher Top Bar */
+.view-mode-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #17181c;
+  border: 1px solid var(--border-grunge);
+  border-radius: 6px;
+  padding: 8px 14px;
+  margin-bottom: 16px;
+}
+
+.mode-pills {
+  display: flex;
+  gap: 4px;
+  background: #0f1012;
+  padding: 3px;
+  border-radius: 4px;
+  border: 1px solid #25272e;
+}
+
+.mode-pill {
+  padding: 6px 14px;
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #94a3b8;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mode-pill:hover {
+  color: #fff;
+}
+
+.mode-pill.active {
+  background: #25272f;
+  color: var(--color-gold);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+
+.mode-pill.active.raptor-mode {
+  color: #ff6b22;
+}
+
+.roster-stats-summary {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.stat-metric strong {
+  color: #fff;
+}
+
+/* ==========================================================================
+   GRID VIEW (FAF Unit Database Columns)
+   ========================================================================== */
+.factions-grid-container {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  min-width: 1400px;
+}
+
+.faction-column {
+  flex: 1;
+  min-width: 220px;
+  max-width: 280px;
+  background: rgba(22, 23, 27, 0.7);
+  border: 1px solid var(--border-grunge);
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.faction-header {
+  padding: 10px 14px;
+  font-family: 'Chakra Petch', sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 2px solid;
+}
+
+.faction-header .f-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.faction-column.uef .faction-header {
+  background: var(--faction-uef-bg);
+  border-color: var(--faction-uef);
+  color: #60a5fa;
+}
+
+.faction-column.cybran .faction-header {
+  background: var(--faction-cybran-bg);
+  border-color: var(--faction-cybran);
+  color: #f87171;
+}
+
+.faction-column.aeon .faction-header {
+  background: var(--faction-aeon-bg);
+  border-color: var(--faction-aeon);
+  color: #4ade80;
+}
+
+.faction-column.seraphim .faction-header {
+  background: var(--faction-seraphim-bg);
+  border-color: var(--faction-seraphim);
+  color: #facc15;
+}
+
+.faction-column.nomads .faction-header {
+  background: var(--faction-nomads-bg);
+  border-color: var(--faction-nomads);
+  color: #fb923c;
+}
+
+.faction-column.raptor .faction-header {
+  background: var(--faction-raptor-bg);
+  border-color: var(--faction-raptor);
+  color: #ff5722;
+  text-shadow: 0 0 10px rgba(255, 87, 34, 0.4);
+}
+
+.tier-section {
+  padding: 8px 10px;
+  border-bottom: 1px solid #23252c;
+}
+
+.tier-section-title {
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #64748b;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tier-pips {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.tier-pip {
+  width: 5px;
+  height: 5px;
+  background: #475569;
+  border-radius: 50%;
+}
+
+.tier-pips.t1 .tier-pip:nth-child(1) { background: #38bdf8; }
+.tier-pips.t2 .tier-pip:nth-child(-n+2) { background: #fbbf24; }
+.tier-pips.t3 .tier-pip:nth-child(-n+3) { background: #f87171; }
+.tier-pips.exp .tier-pip { background: #a855f7; border-radius: 1px; }
+
+.units-subgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+  gap: 6px;
+}
+
+/* Individual Unit Thumb in Grid */
+.unit-thumb {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  background: #141518;
+  border: 1px solid #2d303a;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  overflow: hidden;
+  user-select: none;
+}
+
+.unit-thumb:hover {
+  border-color: var(--color-gold);
+  transform: scale(1.05);
+  z-index: 10;
+  box-shadow: 0 0 12px rgba(253, 160, 5, 0.4);
+}
+
+.unit-thumb.selected {
+  border-color: var(--color-gold-bright);
+  box-shadow: inset 0 0 0 2px var(--color-gold), 0 0 10px rgba(253, 160, 5, 0.6);
+}
+
+.unit-thumb.inspecting {
+  border-color: #38bdf8;
+  box-shadow: inset 0 0 0 2px #38bdf8;
+}
+
+.unit-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.unit-thumb .strategic-badge {
+  position: absolute;
+  top: 1px;
+  left: 2px;
+  width: 15px;
+  height: 15px;
+  pointer-events: none;
+}
+
+.unit-thumb .tier-badge {
+  position: absolute;
+  bottom: 1px;
+  left: 2px;
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 1px 3px #000, 0 0 2px #000;
+  pointer-events: none;
+}
+
+.unit-thumb .thumb-checkbox {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 14px;
+  height: 14px;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid #4b5563;
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: transparent;
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.unit-thumb:hover .thumb-checkbox {
+  border-color: var(--color-gold);
+}
+
+.unit-thumb.selected .thumb-checkbox {
+  background: var(--color-gold);
+  border-color: var(--color-gold-bright);
+  color: #000;
+  font-weight: 700;
+}
+
+/* ==========================================================================
+   COMPARE VIEW (Image 2 - Supreme Commander Detailed Comparison Card)
+   ========================================================================== */
+.compare-view-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.compare-top-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #17181c;
+  border: 1px solid var(--border-grunge);
+  border-radius: 6px;
+  padding: 10px 16px;
+}
+
+.compare-title-heading {
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-gold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.compare-cards-wrapper {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 20px;
+  align-items: flex-start;
+}
+
+/* Detailed Unit Card */
+.unit-detail-card {
+  width: 380px;
+  min-width: 360px;
+  flex-shrink: 0;
+  background: #17181b;
+  border: 1px solid #333640;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  font-size: 12px;
+}
+
+.unit-detail-card.raptor {
+  border-color: #7c2d12;
+  box-shadow: 0 8px 24px rgba(255, 77, 0, 0.15);
+}
+
+/* Card Header matching Screenshot 2 */
+.detail-card-header {
+  padding: 12px 14px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  position: relative;
+  background: #1b1c21;
+  border-bottom: 2px solid;
+}
+
+.detail-card-header.uef { border-color: var(--faction-uef); background: var(--faction-uef-bg); }
+.detail-card-header.cybran { border-color: var(--faction-cybran); background: var(--faction-cybran-bg); }
+.detail-card-header.aeon { border-color: var(--faction-aeon); background: var(--faction-aeon-bg); }
+.detail-card-header.seraphim { border-color: var(--faction-seraphim); background: var(--faction-seraphim-bg); }
+.detail-card-header.nomads { border-color: var(--faction-nomads); background: var(--faction-nomads-bg); }
+.detail-card-header.raptor { border-color: var(--faction-raptor); background: var(--faction-raptor-bg); }
+
+.detail-header-portrait {
+  width: 64px;
+  height: 64px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  object-fit: cover;
+  background: #000;
+  flex-shrink: 0;
+}
+
+.detail-header-info {
+  flex: 1;
+  overflow: hidden;
+}
+
+.detail-header-name {
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-gold);
+  line-height: 1.2;
+  margin-bottom: 2px;
+}
+
+.detail-header-role {
+  font-size: 12px;
+  color: #cbd5e1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.detail-header-id {
+  font-family: monospace;
+  font-size: 11px;
+  color: #94a3b8;
+  letter-spacing: 0.5px;
+}
+
+.detail-close-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid #4b5563;
+  color: #cbd5e1;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 11px;
+  transition: all 0.1s ease;
+}
+
+.detail-close-btn:hover {
+  background: #ef4444;
+  border-color: #ef4444;
+  color: #fff;
+}
+
+/* Quick Summary Bar: +Health, Mass, Energy, Time */
+.detail-quick-bar {
+  display: flex;
+  background: #121316;
+  border-bottom: 1px solid #282a33;
+  padding: 8px 12px;
+  justify-content: space-around;
+  font-family: 'Chakra Petch', monospace;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.quick-stat-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.quick-stat-item.health { color: var(--color-health); }
+.quick-stat-item.mass { color: var(--color-mass); }
+.quick-stat-item.energy { color: var(--color-energy); }
+.quick-stat-item.time { color: var(--color-time); }
+
+/* Table Sections matching Screenshot 2 */
+.detail-section {
+  border-bottom: 1px solid #23252d;
+}
+
+.detail-section-header {
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #94a3b8;
+  padding: 8px 14px 4px 14px;
+  letter-spacing: 0.5px;
+}
+
+.detail-stats-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.detail-stats-table tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.detail-stats-table td {
+  padding: 4px 14px;
+  font-size: 12px;
+  vertical-align: top;
+}
+
+.detail-stats-table td:first-child {
+  width: 45%;
+  color: #8892b0;
+}
+
+.detail-stats-table td:last-child {
+  width: 55%;
+  color: #f1f5f9;
+  text-align: right;
+  font-family: monospace;
+}
+
+/* Ability Badges */
+.abilities-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 14px 10px 14px;
+}
+
+.ability-tag {
+  background: #20222a;
+  border: 1px solid #373b47;
+  color: #cbd5e1;
+  padding: 3px 7px;
+  border-radius: 3px;
+  font-size: 11px;
+}
+
+.ability-tag.highlight {
+  background: rgba(255, 87, 34, 0.15);
+  border-color: #ff5722;
+  color: #ff7844;
+  font-weight: 600;
+}
+
+/* Veterancy Table */
+.vet-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  margin: 4px 0 8px 0;
+}
+
+.vet-table th {
+  color: #64748b;
+  text-align: center;
+  padding: 4px 6px;
+  font-weight: 500;
+  border-bottom: 1px solid #282a33;
+}
+
+.vet-table td {
+  text-align: center;
+  padding: 4px 6px;
+  color: #cbd5e1;
+  font-family: monospace;
+  border-bottom: 1px solid #1f2128;
+}
+
+.vet-table td:first-child {
+  color: var(--color-gold);
+  font-weight: 700;
+}
+
+/* Weapon Cards matching Screenshot 2 */
+.weapon-block {
+  background: #141518;
+  border: 1px solid #282a33;
+  border-radius: 4px;
+  margin: 6px 14px 10px 14px;
+  padding: 8px 10px;
+}
+
+.weapon-title-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.weapon-name-text {
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-gold-bright);
+}
+
+.weapon-dps-badge {
+  background: rgba(248, 113, 113, 0.15);
+  border: 1px solid #ef4444;
+  color: #f87171;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-family: monospace;
+  font-weight: 700;
+}
+
+.weapon-category-tag {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-bottom: 6px;
+}
+
+.weapon-meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3px 8px;
+  font-size: 11px;
+}
+
+.w-meta-item {
+  display: flex;
+  justify-content: space-between;
+}
+
+.w-meta-label {
+  color: #64748b;
+}
+
+.w-meta-val {
+  color: #e2e8f0;
+  font-family: monospace;
+}
+
+/* Agent Markdown Preview Section */
+.agent-summary-container {
+  background: #151619;
+  border: 1px solid var(--border-grunge);
+  border-radius: 6px;
+  padding: 16px;
+}
+
+.agent-toolbar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.agent-md-box {
+  background: #0d0e10;
+  border: 1px solid #272932;
+  border-radius: 4px;
+  padding: 14px;
+  color: #e2e8f0;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre;
+  overflow-x: auto;
+  max-height: 600px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .unitdb-layout {
+    flex-direction: column-reverse;
+  }
+  .unitdb-sidebar {
+    width: 100%;
+    position: relative;
+    top: 0;
+    height: auto;
+    border-left: none;
+    border-bottom: 1px solid var(--border-grunge);
+  }
+}

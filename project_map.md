@@ -318,6 +318,27 @@ flowchart TD
 
 ---
 
+### Module 8: Raptor Swarm Faction Roster & Visual FAF Unit Database (unitdb)
+* **Web UI:** `/unitdb`, `/raptors`, `/roster` (`templates/unitdb.html`) | **Scripts:** `static/js/unitdb.js`, `static/css/unitdb.css` | **Agent API:** `raptor_roster.py`, `build_raptor_json.py`, `data/raptor_units.json`
+* **Agent Capabilities:**
+  * `from raptor_roster import get_raptor_roster, get_raptor_roster_summary, get_raptor_unit`
+  * CLI execution: `python raptor_roster.py --tier T1`, `python raptor_roster.py --unit XRA0401`, `python raptor_roster.py --json`
+  * HTTP REST APIs:
+    * `GET /api/raptors` or `GET /api/raptor-roster` — Full JSON array of all 31 Raptor units.
+    * `GET /api/raptor-roster?format=summary` — Clean Markdown table for LLM context and quick inspection.
+    * `GET /api/raptors/<unit_id>` — Detailed single-unit blueprint specifications.
+    * `GET /api/unitdb` — Combined 534-unit catalog (503 FAF units + 31 Raptor units) with full stats, econometrics, intel, physics, and weapon profiles.
+* **Human Web Application (FAF Unit Database Replica):**
+  * **Multi-Faction Grid View:** 6 faction columns (UEF, Cybran, Aeon, Seraphim, Nomads, and Raptor Swarm) grouped by Tech Tier (T1, T2, T3, EXP) with 64x64 icons, strategic badges, and selection checkmarks.
+  * **Side-by-Side Comparator View:** Replicates the iconic Supreme Commander FAF Unit Database layout:
+    * High-resolution unit portrait with faction underglow banner.
+    * Quick summary ribbon (+Health, Mass cost, Energy cost, Build time).
+    * Comprehensive breakdown tables for **Economy**, **Abilities**, **Intel**, **Physics**, **Wreckage**, and **Veterancy** (Levels 1–5).
+    * Detailed **Weapons** cards: DPS, single-shot damage, RoF, fire cycle, min/max range, muzzle velocity, turret pitch/yaw speeds, and special effects (EMP shield disruption, acid DoT, living brood egg salvos).
+  * **Interactive Sidebar:** Fast text search, multi-faction toggles, layer/role filters, tech tier selectors, quick preset buttons, and 1-click comparison launcher.
+
+---
+
 ## 6. How to Change & Extend the System
 
 ### How to Add a New Unit Stat Multiplier

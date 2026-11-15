@@ -918,12 +918,12 @@ bp_magmaproj = """ProjectileBlueprint {
     Audio = {
         Impact = Sound {
             Bank = 'Impacts',
-            Cue = 'Cybran_Expl_Med_Impact',
+            Cue = 'CYB_Expl_Med_Impact',
             LodCutoff = 'Weapon_LodCutoff',
         },
         ImpactTerrain = Sound {
             Bank = 'Impacts',
-            Cue = 'Cybran_Expl_Med_Impact',
+            Cue = 'CYB_Expl_Med_Impact',
             LodCutoff = 'Weapon_LodCutoff',
         },
         ImpactWater = Sound {

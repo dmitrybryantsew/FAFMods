@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FAF Unit Database & Raptor Swarm Roster - FAF Mod Forge</title>
+  <link rel="stylesheet" href="/static/css/spooky.css">
+  <link rel="stylesheet" href="/static/css/app.css">
+  <link rel="stylesheet" href="/static/css/unitdb.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="unitdb-body">
+  <!-- Top Application Header -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="logo-mark" style="background: linear-gradient(135deg, #ff4d00, #b91c1c);">FAF</div>
+      <div>
+        <h1 class="logo-title">UNIT DATABASE <span style="font-size: 14px; color: #ff5722; font-weight: normal;">& Raptor Swarm</span></h1>
+        <p class="logo-subtitle">Complete FAF visual unitdb & Raptor Swarm roster with comparative analytics</p>
+      </div>
+      <nav class="nav-links">
+        <a href="/" class="nav-link">⚡ Unit Stat Forge <span class="nav-badge" id="nav-count-buffs">0</span></a>
+        <a href="/limits" class="nav-link limits">🛑 Unit Limiter <span class="nav-badge" id="nav-count-limits">0</span></a>
+        <a href="/popups" class="nav-link popups">📢 Event Popups <span class="nav-badge" id="nav-count-popups">0</span></a>
+        <a href="/relics" class="nav-link relics">💎 Relic Objectives <span class="nav-badge" id="nav-count-relics">0</span></a>
+        <a href="/lootbox" class="nav-link lootbox">🎰 Surprise Casino <span class="nav-badge" id="nav-count-lootbox">0</span></a>
+        <a href="/combined" class="nav-link combined">📦 Combined Mod <span class="nav-badge accent" id="nav-count-combined">0</span></a>
+        <a href="/animator" class="nav-link" style="color: #38bdf8;">🦖 3D Studio</a>
+        <a href="/unitdb" class="nav-link active" style="color: #ff5722; font-weight: 700; border-bottom: 2px solid #ff5722;">🐾 FAF Unit DB & Raptors</a>
+      </nav>
+    </div>
+    <div class="header-right">
+      <div class="stats-badge" style="border-color: #ff5722;">
+        <span class="badge-label">Raptors:</span>
+        <span class="badge-val" id="raptor-units-badge" style="color: #ff5722;">31</span>
+      </div>
+      <div class="stats-badge">
+        <span class="badge-label">Total Units:</span>
+        <span class="badge-val" id="total-units-badge">534</span>
+      </div>
+      <a href="/api/raptors" target="_blank" class="btn btn-secondary" title="View or fetch raw JSON for AI agents">
+        🤖 Agent API
+      </a>
+    </div>
+  </header>
+
+  <!-- Main View Layout -->
+  <div class="unitdb-layout">
+    <!-- Center Content: Grid or Compare Cards -->
+    <main class="unitdb-content">
+      <!-- Mode Switcher Bar -->
+      <div class="view-mode-bar">
+        <div class="mode-pills">
+          <button class="mode-pill active" data-mode="grid">📊 Grid View (FAF DB)</button>
+          <button class="mode-pill" data-mode="compare">⚡ Compare Cards (Image 2)</button>
+          <button class="mode-pill raptor-mode" data-mode="agent">🤖 Agent Roster (Markdown/API)</button>
+        </div>
+        <div class="roster-stats-summary">
+          <span class="stat-metric">Factions: <strong>6</strong> (UEF, Cybran, Aeon, Seraphim, Nomads, Raptor)</span>
+          <span class="stat-metric">Tech: <strong>T1, T2, T3, T4 Experimental</strong></span>
+        </div>
+      </div>
+
+      <!-- Main Units Container (Injected by unitdb.js) -->
+      <div id="unitdb-main-container">
+        <div style="text-align: center; padding: 60px; color: #94a3b8; font-family: 'Chakra Petch', sans-serif;">
+          <h2>Loading FAF & Raptor Swarm Unit Database...</h2>
+          <p>Indexing blueprints and weapons...</p>
+        </div>
+      </div>
+    </main>
+
+    <!-- Right Sticky Sidebar (FAF UnitDB Style) -->
+    <aside class="unitdb-sidebar">
+      <!-- Compare Action Box -->
+      <div class="sidebar-compare-box">
+        <div class="compare-count-text">
+          <span class="compare-count-number" id="compare-count-display">0</span> Selected for Compare
+        </div>
+        <button class="btn-compare-action" id="btn-compare-action" disabled>
+          ⚡ Compare (0)
+        </button>
+        <button class="btn-clear-selection" id="btn-clear-selection">Clear Selection</button>
+      </div>
+
+      <!-- Search Box -->
+      <div class="sidebar-search">
+        <div class="sidebar-section-title">Filter Units</div>
+        <input type="text" id="unitdb-search" placeholder="Filter by name, ID, role..." autocomplete="off">
+      </div>
+
+      <!-- Faction Filters -->
+      <div>
+        <div class="sidebar-section-title">Faction</div>
+        <div class="sidebar-button-group">
+          <button class="filter-btn active" data-filter="faction" data-val="ALL">
+            <span class="filter-icon">🌐</span> All Factions <span class="filter-count">534</span>
+          </button>
+          <button class="filter-btn raptor" data-filter="faction" data-val="Raptor">
+            <span class="filter-icon">🦖</span> Raptor Swarm <span class="filter-count">31</span>
+          </button>
+          <button class="filter-btn" data-filter="faction" data-val="UEF">
+            <span class="filter-icon" style="color: #3b82f6;">■</span> UEF <span class="filter-count">106</span>
+          </button>
+          <button class="filter-btn" data-filter="faction" data-val="Cybran">
+            <span class="filter-icon" style="color: #ef4444;">▲</span> Cybran <span class="filter-count">103</span>
+          </button>
+          <button class="filter-btn" data-filter="faction" data-val="Aeon">
+            <span class="filter-icon" style="color: #22c55e;">●</span> Aeon <span class="filter-count">102</span>
+          </button>
+          <button class="filter-btn" data-filter="faction" data-val="Seraphim">
+            <span class="filter-icon" style="color: #eab308;">✦</span> Seraphim <span class="filter-count">98</span>
+          </button>
+          <button class="filter-btn" data-filter="faction" data-val="Nomads">
+            <span class="filter-icon" style="color: #f97316;">⬢</span> Nomads <span class="filter-count">94</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Tech Tier Filters -->
+      <div>
+        <div class="sidebar-section-title">Tech Tier</div>
+        <div class="sidebar-button-group">
+          <button class="filter-btn active" data-filter="tech" data-val="ALL">
+            <span>●</span> All Tiers
+          </button>
+          <button class="filter-btn" data-filter="tech" data-val="T1">
+            <span style="color: #38bdf8;">•</span> Tier 1 (T1)
+          </button>
+          <button class="filter-btn" data-filter="tech" data-val="T2">
+            <span style="color: #fbbf24;">••</span> Tier 2 (T2)
+          </button>
+          <button class="filter-btn" data-filter="tech" data-val="T3">
+            <span style="color: #f87171;">•••</span> Tier 3 (T3)
+          </button>
+          <button class="filter-btn" data-filter="tech" data-val="EXP">
+            <span style="color: #a855f7;">★</span> Experimental (T4)
+          </button>
+        </div>
+      </div>
+
+      <!-- Layer / Role Filters -->
+      <div>
+        <div class="sidebar-section-title">Layer / Role</div>
+        <div class="sidebar-button-group">
+          <button class="filter-btn active" data-filter="utype" data-val="ALL">All Layers</button>
+          <button class="filter-btn" data-filter="utype" data-val="LAND">Land Units</button>
+          <button class="filter-btn" data-filter="utype" data-val="AIR">Air Units</button>
+          <button class="filter-btn" data-filter="utype" data-val="NAVAL">Naval Units</button>
+          <button class="filter-btn" data-filter="utype" data-val="DEFENSE">Defenses & Spires</button>
+          <button class="filter-btn" data-filter="utype" data-val="STRUCTURE">Structures & Hives</button>
+        </div>
+      </div>
+
+      <!-- Quick Presets -->
+      <div>
+        <div class="sidebar-section-title">Quick Presets</div>
+        <div class="sidebar-presets">
+          <button class="preset-chip highlight" data-preset="raptors-all">
+            🦖 Full Raptor Swarm (31)
+          </button>
+          <button class="preset-chip" data-preset="raptors-land">
+            🐾 Raptor Land Army
+          </button>
+          <button class="preset-chip" data-preset="raptors-air">
+            🦅 Raptor Air Swarm
+          </button>
+          <button class="preset-chip" data-preset="raptors-artillery">
+            🌋 Raptor Spires & Artillery
+          </button>
+          <button class="preset-chip" data-preset="compare-queens">
+            ⚔️ Queen Titan vs Colossus vs Monkeylord
+          </button>
+          <button class="preset-chip" data-preset="compare-swarmer">
+            ⚔️ Raptor Swarmer vs Mantis vs Striker
+          </button>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/static/js/forge-store.js"></script>
+  <script src="/static/js/unitdb.js"></script>
+</body>
+</html>

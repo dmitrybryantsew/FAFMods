@@ -9,6 +9,8 @@
 -- **
 -- ****************************************************************************
 
+local Targeting = import('/mods/RaptorFaction/lua/RaptorTargeting.lua')
+
 local QueenAdaptiveTable = {}
 
 ---Processes incoming damage on the Queen Titan with adaptive resistance, phases, and stagger
@@ -163,3 +165,201 @@ function StartQueenGestationThread(queen)
         end
     end)
 end
+
+---Fires apocalyptic meteor bombardment targeting highest threat cluster (player base core)
+---@param queen Unit
+function FireQueenMeteorStrike(queen)
+    if not queen or queen.Dead or queen.IsStaggered then return end
+    local aiBrain = queen:GetAIBrain()
+    local targetPos = Targeting.GetWeightedEnemyTarget(queen:GetArmy(), queen:GetPosition())
+
+    if targetPos then
+        Sync.RaptorAnnounce = {
+            Text = "DANGER: QUEEN TITAN METEOR BOMBARDMENT DETECTED!",
+            Color = 'red'
+        }
+
+        local weapon = queen:GetWeaponByLabel('RoarCannon') or queen:GetWeapon(1)
+        if weapon and weapon.SetTargetGround then
+            weapon:SetTargetGround(targetPos)
+        end
+    end
+end
+
+---Starts continuous Queen Titan meteor bombardment thread
+---@param queen Unit
+function StartQueenBombardmentThread(queen)
+    queen:ForkThread(function()
+        -- Initial grace period after hatching
+        WaitSeconds(40.0)
+        while queen and not queen.Dead do
+            if not queen.IsStaggered then
+                FireQueenMeteorStrike(queen)
+            end
+            WaitSeconds(50.0 + math.random() * 20.0)
+        end
+    end)
+end
+
+---Starts continuous Kinetic Stomp Shockwave thread on the Land Matriarch Queen Titan
+---Flings T1-T3 units into the air and applies safe Kinetic Stagger (pitch tilt + stun) to Experimentals and ACUs
+---@param queen Unit
+function StartQueenKineticStompThread(queen)
+    queen:ForkThread(function()
+        local brain = queen:GetAIBrain()
+        local army = queen:GetArmy()
+
+        -- Initial grace delay after hatching
+        WaitSeconds(15.0)
+
+        while queen and not queen.Dead do
+            WaitSeconds(16.0 + math.random() * 8.0)
+
+            -- Stomp only occurs if queen is active and not staggered
+            if queen and not queen.Dead and not queen.IsStaggered then
+                local qPos = queen:GetPosition()
+
+                -- Scan 22 radius around Queen for enemy units
+                local enemies = brain:GetUnitsAroundPoint(categories.SELECTABLE - categories.STRUCTURE, qPos, 22.0, 'Enemy')
+
+                if enemies and table.getn(enemies) > 0 then
+                    -- 1. Stomp Roar Animation & Camera Earthquake
+                    local roarAnim = CreateAnimator(queen)
+                    roarAnim:PlayAnim('/mods/RaptorFaction/units/XRA0401/XRA0401_Aroar.sca', false)
+                    roarAnim:SetRate(1.5)
+
+                    queen:ShakeCamera(45, 3.0, 0, 1.5)
+
+                    -- 2. Massive Shockwave & Blood Smoke FX
+                    CreateEmitterAtEntity(queen, army, '/mods/RaptorFaction/effects/emitters/raptor_blood_cloud_01_emit.bp'):ScaleEmitter(4.5)
+                    CreateEmitterAtEntity(queen, army, '/mods/RaptorFaction/effects/emitters/raptor_bio_smoke_01_emit.bp'):ScaleEmitter(5.5)
+
+                    -- 3. Kinetic Stagger & Toss Mechanics
+                    for _, target in enemies do
+                        if target and not target.Dead and not target:BeenDestroyed() then
+                            local tPos = target:GetPosition()
+                            local dX = tPos[1] - qPos[1]
+                            local dZ = tPos[3] - qPos[3]
+                            local dist = math.sqrt(dX * dX + dZ * dZ)
+                            if dist < 0.1 then dist = 1.0 end
+                            local normX = dX / dist
+                            local normZ = dZ / dist
+
+                            local bp = target:GetBlueprint()
+                            local cats = bp.CategoriesHash or {}
+
+                            -- A. T4 EXPERIMENTALS & ACUS (Galactic Colossus, Fatboy, Megalith, ACU)
+                            -- Safe Kinetic Stagger: Screen rumble + bone pitch tilt + C++ engine stun (ZERO desyncs!)
+                            if cats['EXPERIMENTAL'] or cats['COMMAND'] then
+                                Damage(queen, qPos, target, 2200, 'Normal')
+                                target:SetStunned(2.5)
+
+                                -- Slams the Colossus backward 18 degrees on its heels!
+                                local staggerRot = CreateRotator(target, 0, 'x', -18, 45, 90)
+                                target:ForkThread(function()
+                                    WaitSeconds(1.0)
+                                    if target and not target.Dead and not target:BeenDestroyed() then
+                                        staggerRot:SetGoal(0)
+                                        WaitSeconds(1.0)
+                                        staggerRot:Destroy()
+                                    end
+                                end)
+                            -- B. T1, T2, T3 UNITS (Tanks, Bots, Walkers)
+                            -- Violent Radial Fling / Toss through the air
+                            else
+                                Damage(queen, qPos, target, 950, 'TreeForce')
+                                target:SetStunned(2.0)
+
+                                local flingDist = 16.0
+                                local fx = normX * flingDist
+                                local fz = normZ * flingDist
+                                local slider = CreateSlider(target, 0, fx, 3.5, fz, 30, true)
+                                target:ForkThread(function()
+                                    WaitSeconds(0.6)
+                                    if target and not target.Dead and not target:BeenDestroyed() then
+                                        slider:SetGoal(0, 0, 0)
+                                        slider:SetSpeed(15)
+                                        WaitSeconds(0.6)
+                                        slider:Destroy()
+                                    end
+                                end)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end)
+end
+
+---Transitions from Phase 1 (Apex Sky Queen XRA0402) to Phase 2 (Land Matriarch Queen Titan XRA0401)
+---Detonates apocalyptic crash bio-nuke and summons the Land Titan out of the crater
+---@param skyQueen Unit
+function TransitionToLandQueen(skyQueen)
+    if not skyQueen then return end
+
+    local brain = skyQueen:GetAIBrain()
+    local army = skyQueen.Army
+    local pos = skyQueen:GetPosition()
+    local cx = pos[1]
+    local cz = pos[3]
+    local cy = GetSurfaceHeight(cx, cz)
+    local crashPos = Vector(cx, cy, cz)
+
+    -- Apocalyptic screen earthquake
+    skyQueen:ShakeCamera(55, 4.5, 0, 3.0)
+
+    Sync.RaptorAnnounce = {
+        Text = "CRITICAL ALERT: THE SKY QUEEN HAS CRASHED! APOCALYPTIC BIO-NUKE IMPACT!",
+        Color = 'red'
+    }
+
+    -- 1. Cataclysmic Crater Detonation (12,000 Damage + TreeForce)
+    DamageArea(skyQueen, crashPos, 26, 12000, 'TreeForce', true, false)
+    DamageArea(skyQueen, crashPos, 30, 4500, 'TreeFire', true, false)
+
+    -- 2. Massive Death Emitters at Crash Site
+    CreateEmitterAtBone(skyQueen, -1, army, '/mods/RaptorFaction/effects/emitters/raptor_blood_cloud_01_emit.bp'):ScaleEmitter(8.0)
+    CreateEmitterAtBone(skyQueen, -1, army, '/mods/RaptorFaction/effects/emitters/raptor_bio_smoke_01_emit.bp'):ScaleEmitter(10.0)
+
+    -- 3. Sprout permanent Creep node at crash site
+    local Creep = import('/mods/RaptorFaction/lua/RaptorCreep.lua')
+    if Creep and Creep.StartCreepNode then
+        local tube = brain:CreateUnitNearSpot('XRA0121', cx, cz)
+        if tube then
+            Creep.StartCreepNode(tube, 60.0, 1.0)
+        end
+    end
+
+    -- 4. Awaken Phase 2: Land Matriarch Queen Titan (XRA0401)
+    local landQueen = brain:CreateUnitNearSpot('XRA0401', cx, cz)
+    if landQueen then
+        local Spawner = import('/mods/RaptorFaction/lua/RaptorSpawner.lua')
+        local Stats = import('/mods/RaptorFaction/lua/RaptorStats.lua')
+
+        if Spawner and Stats then
+            local tAnger = (Spawner.GetTechAnger and Spawner.GetTechAnger()) or 50
+            local qAnger = (Spawner.GetQueenAnger and Spawner.GetQueenAnger()) or 100
+            local diff = (Spawner.GetCurrentDifficulty and Spawner.GetCurrentDifficulty()) or 'normal'
+            Stats.RecomputeRaptorStats(landQueen, tAnger, qAnger, diff)
+            if Spawner.SetActiveQueen then
+                Spawner.SetActiveQueen(landQueen)
+            end
+        end
+
+        Sync.RaptorAnnounce = {
+            Text = "BEHOLD: THE LAND MATRIARCH QUEEN TITAN RISES FROM THE BIO-CRATER!",
+            Color = 'red'
+        }
+
+        -- Start Phase 2 Boss Threads
+        StartQueenGestationThread(landQueen)
+        StartQueenBombardmentThread(landQueen)
+        StartQueenKineticStompThread(landQueen)
+
+        -- Order Land Queen directly into combat
+        local target = Targeting.GetWeightedEnemyTarget(army, crashPos)
+        IssueAggressiveMove({landQueen}, target)
+    end
+end
+

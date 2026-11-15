@@ -289,7 +289,7 @@ def calc_xact_crc(data):
         crc = (crc >> 8) ^ CRC16_TABLE[idx]
     return (~crc) & 0xFFFF
 
-def build_xact_bank(soundbank_name, wavebank_name, cue_name, wav_bytes):
+def build_xact_bank(soundbank_name, wavebank_name, cue_name, wav_bytes, cat_id=6):
     with wave.open(io.BytesIO(wav_bytes), 'rb') as w:
         wav_pcm = w.readframes(w.getnframes())
         num_samples = w.getnframes()
@@ -329,6 +329,7 @@ def build_xact_bank(soundbank_name, wavebank_name, cue_name, wav_bytes):
     sb_name_64 = soundbank_name.encode('ascii')[:63].ljust(64, b'\x00')
     sb[0x4a : 0x4a + 64] = sb_name_64
     sb[0x8a : 0x8a + 64] = wb_name_64
+    struct.pack_into('<H', sb, 203, cat_id)
     sb[229] = 0  # loopCount = 0 (one-shot)
     for i in range(16):
         struct.pack_into('<H', sb, 239 + i*2, 0)
@@ -392,16 +393,21 @@ bp_weaver = """UnitBlueprint {
     },
     Audio = {
         Construct = Sound {
-            Bank = 'Raptor_Attack',
-            Cue = 'Attack',
+            Bank = 'URL',
+            Cue = 'URL0105_Construct_Start',
+            LodCutoff = 'UnitMove_LodCutoff',
+        },
+        ConstructLoop = Sound {
+            Bank = 'URL',
+            Cue = 'URL0105_Construct_Loop',
+            LodCutoff = 'UnitMove_LodCutoff',
+        },
+        UISelection = Sound {
+            Bank = 'Interface',
+            Cue = 'Cybran_Select_Vehicle',
             LodCutoff = 'UnitMove_LodCutoff',
         },
         Destroyed = Sound {
-            Bank = 'Raptor_Death',
-            Cue = 'Death',
-            LodCutoff = 'UnitMove_LodCutoff',
-        },
-        Killed = Sound {
             Bank = 'Raptor_Death',
             Cue = 'Death',
             LodCutoff = 'UnitMove_LodCutoff',
@@ -1740,7 +1746,7 @@ TypeClass = XRA_MeteorShell01
 """
 
 
-make_arty_proj(dir_proj_meteor, "XRA_MeteorShell01", "XRA0309", "/effects/emitters/plasma_cannon_polytrail_04_emit.bp", impact_bank='Raptor_Nuke_Explosion', impact_cue='Explosion', custom_script=script_meteor_proj)
+make_arty_proj(dir_proj_meteor, "XRA_MeteorShell01", "XRA0309", "/effects/emitters/plasma_cannon_polytrail_04_emit.bp", impact_bank='Impacts', impact_cue='XSL_Artillery_Impact', custom_script=script_meteor_proj)
 
 # Build each of the 4 Artillery Spire units
 for cfg in arty_configs:

@@ -224,7 +224,6 @@ XRA0103 = ClassUnit(CWalkingLandUnit) {
             CreateEmitterAtEntity(self, army, emit):ScaleEmitter(1.5)
         end
 
-        self:PlayUnitSound('Destroyed')
         if not self.Dead then
             self:Kill()
         end
@@ -476,7 +475,6 @@ XRA0203 = ClassUnit(CWalkingLandUnit) {
             CreateEmitterAtEntity(self, army, emit):ScaleEmitter(2.5)
         end
 
-        self:PlayUnitSound('Destroyed')
         if not self.Dead then
             self:Kill()
         end
@@ -701,7 +699,6 @@ XRA0310 = ClassUnit(CWalkingLandUnit) {
             CreateEmitterAtEntity(self, army, emit):ScaleEmitter(3.5)
         end
 
-        self:PlayUnitSound('Destroyed')
         if not self.Dead then
             self:Kill()
         end
