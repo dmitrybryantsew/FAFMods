@@ -1065,7 +1065,7 @@ for u in NEW_UNITS:
         if "ANTIAIR" in cats and "BOMBER" not in cats:
             if u.get("tech") == "T3":
                 air_block = f"""    Air = {{
-        AutoLandTime = 1,
+        AutoLandTime = 0,
         BankFactor = 4.0,
         BankForward = false,
         BreakOffDistance = 10,
@@ -1092,7 +1092,7 @@ for u in NEW_UNITS:
 """
             else:
                 air_block = f"""    Air = {{
-        AutoLandTime = 1,
+        AutoLandTime = 0,
         BankFactor = 0.4,
         BankForward = false,
         CanFly = true,
@@ -1122,7 +1122,7 @@ for u in NEW_UNITS:
 """
         elif "BOMBER" in cats:
             air_block = f"""    Air = {{
-        AutoLandTime = 1,
+        AutoLandTime = 0,
         BankFactor = 3,
         BankForward = false,
         BreakOffDistance = 36,
@@ -1152,7 +1152,7 @@ for u in NEW_UNITS:
 """
         elif "KAMIKAZE" in cats:
             air_block = f"""    Air = {{
-        AutoLandTime = 1,
+        AutoLandTime = 0,
         BankFactor = 3.5,
         BankForward = false,
         BreakOffDistance = 5,
@@ -1179,7 +1179,7 @@ for u in NEW_UNITS:
 """
         else:
             air_block = f"""    Air = {{
-        AutoLandTime = 1,
+        AutoLandTime = 0,
         BankFactor = 0.4,
         BankForward = false,
         CanFly = true,

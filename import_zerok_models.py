@@ -798,7 +798,7 @@ def run_import():
             else:
                 elevation_str = "Elevation = 14.0," if is_flying else ""
                 air_bp = f"""    Air = {{
-        AutoLandTime = 1,
+        AutoLandTime = 0,
         BankFactor = 1.5,
         BankForward = false,
         BreakOffDistance = 32,

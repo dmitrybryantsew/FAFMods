@@ -800,10 +800,10 @@ function SpawnWave(brain)
                 PlatoonAI.ManageRaptorScoutSquad(scoutPlatoon, targetPos)
             end
 
-            -- Form Air Combat Platoon in GrowthFormation with dedicated aerial combat AI
+            -- Form Air Combat Platoon in NoFormation with dedicated aerial combat AI
             if table.getn(combatAirUnits) > 0 then
                 local airPlatoon = brain:MakePlatoon('RaptorAirWave', '')
-                brain:AssignUnitsToPlatoon(airPlatoon, combatAirUnits, 'Attack', 'GrowthFormation')
+                brain:AssignUnitsToPlatoon(airPlatoon, combatAirUnits, 'Attack', 'NoFormation')
                 PlatoonAI.ManageRaptorAirSquad(airPlatoon, targetPos)
             end
         end

@@ -107,14 +107,14 @@ local function SwapDecalSize(entry, newSize)
     if not entry or not entry.pos then return end
     local pos = entry.pos
     local heading = entry.heading or 0
-    local army = entry.army or -1
+    local army = (entry.army and entry.army >= 0 and entry.army) or 0
 
     -- Ensure pos is a valid Vector
     local decalPos = Vector(pos[1], pos[2], pos[3])
 
     -- 1. Create NEW decals FIRST in the DirectX 9 buffer:
-    local dAlb = CreateDecal(decalPos, heading, CreepAlbedo, '', 'Albedo', newSize, newSize, LOD_CUTOFF_ALBEDO, 0, army, 0)
-    local dNorm = CreateDecal(decalPos, heading, CreepNormals, '', 'Alpha Normals', newSize, newSize, LOD_CUTOFF_NORMAL, 0, army, 0)
+    local dAlb = CreateDecal(decalPos, heading, CreepAlbedo, '', 'Albedo', newSize, newSize, LOD_CUTOFF_ALBEDO, 0, army)
+    local dNorm = CreateDecal(decalPos, heading, CreepNormals, '', 'Alpha Normals', newSize, newSize, LOD_CUTOFF_NORMAL, 0, army)
     local newDecals = { dAlb, dNorm }
 
     -- 2. Destroy OLD decals AFTER new ones exist (Zero empty frames -> ZERO FLICKER):
@@ -192,9 +192,9 @@ local function RequestMacroDecal(unit, pos)
 
     -- 2. New territory! Spawn a new macro-decal patch
     local heading = math.random() * 6.2831853
-    local army = -1
+    local army = 0
     if unit and not unit.Dead and unit.GetArmy then
-        army = unit:GetArmy()
+        army = unit:GetArmy() or 0
     end
 
     local entry = {

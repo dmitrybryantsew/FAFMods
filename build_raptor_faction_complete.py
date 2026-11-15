@@ -682,20 +682,22 @@ bp_nukeproj = """ProjectileBlueprint {
             IconFadeInZoom = 200,
             LODs = {
                 {
-                    AlbedoName = '/mods/RaptorFaction/units/XRA0304/XRA0304_Albedo.dds',
-                    LODCutoff = 150,
-                    MeshName = '/mods/RaptorFaction/projectiles/XRA_Spike01/XRA_Spike01_lod0.scm',
-                    ShaderName = 'TMeshNoLighting',
+                    AlbedoName = '/mods/RaptorFaction/projectiles/XRA_BioNuke01/XRA_BioNuke01_Albedo.dds',
+                    LODCutoff = 350,
+                    MeshName = '/mods/RaptorFaction/projectiles/XRA_BioNuke01/XRA_BioNuke01_lod0.scm',
+                    NormalsName = '/mods/RaptorFaction/units/XRA0101/XRA0101_NormalsTS.dds',
+                    SpecularName = '/mods/RaptorFaction/units/XRA0101/XRA0101_SpecTeam.dds',
+                    ShaderName = 'Insect',
                 },
             },
         },
         StrategicIconSize = 3,
-        UniformScale = 8.0,
+        UniformScale = 2.8,
     },
     Economy = {
-        BuildCostEnergy = 1350000,
-        BuildCostMass = 12000,
-        BuildTime = 324000,
+        BuildCostEnergy = 0,
+        BuildCostMass = 0,
+        BuildTime = 450000,
     },
     General = {
         Category = 'Missile',
@@ -730,31 +732,42 @@ bp_nukeproj = """ProjectileBlueprint {
 with open(os.path.join(dir_proj_nuke, "XRA_BioNuke01_proj.bp"), "w") as f:
     f.write(bp_nukeproj)
 
-script_nukeproj = """local NukeProjectile = import('/lua/sim/projectiles/nukeprojectile.lua').NukeProjectile
+script_nukeproj = """local NukeProjectile = import('/lua/sim/DefaultProjectiles.lua').NukeProjectile
 
 ---@class XRA_BioNuke01 : NukeProjectile
 XRA_BioNuke01 = ClassProjectile(NukeProjectile) {
-    FxSplashScale = 0.5,
-    FxTrails = {},
+    BeamName = '/effects/emitters/missile_exhaust_fire_beam_06_emit.bp',
+    PolyTrail = '/mods/RaptorFaction/effects/emitters/raptor_spore_polytrail_01_emit.bp',
 
     InitialEffects = {
-        '/effects/emitters/seraphim_inaino_fxtrails_01_emit.bp',
-        '/effects/emitters/seraphim_inaino_fxtrails_02_emit.bp',
-    },
-    ThrustEffects = {
-        '/effects/emitters/seraphim_inaino_fxtrails_01_emit.bp',
-        '/effects/emitters/seraphim_inaino_fxtrails_02_emit.bp',
+        '/mods/RaptorFaction/effects/emitters/raptor_acid_steam_01_emit.bp',
+        '/mods/RaptorFaction/effects/emitters/raptor_creep_spores_01_emit.bp',
+        '/effects/emitters/nuke_munition_launch_trail_02_emit.bp',
     },
     LaunchEffects = {
-        '/effects/emitters/seraphim_inaino_fxtrails_01_emit.bp',
-        '/effects/emitters/seraphim_inaino_fxtrails_02_emit.bp',
+        '/mods/RaptorFaction/effects/emitters/raptor_acid_steam_01_emit.bp',
+        '/mods/RaptorFaction/effects/emitters/raptor_bio_smoke_01_emit.bp',
+        '/effects/emitters/nuke_munition_launch_trail_03_emit.bp',
+        '/effects/emitters/nuke_munition_launch_trail_05_emit.bp',
+    },
+    ThrustEffects = {
+        '/mods/RaptorFaction/effects/emitters/raptor_spore_polytrail_01_emit.bp',
+        '/mods/RaptorFaction/effects/emitters/raptor_creep_spores_01_emit.bp',
+        '/effects/emitters/nuke_munition_launch_trail_04_emit.bp',
     },
 
-    ---@param self XRA_BioNuke01
     OnCreate = function(self)
         NukeProjectile.OnCreate(self)
-        self.effectEntityPath = '/effects/entities/InainoEffectController01/InainoEffectController01_proj.bp'
+        self.effectEntityPath = '/mods/RaptorFaction/effects/entities/XRA_BioNukeEffect01/XRA_BioNukeEffect01_proj.bp'
         self:LauncherCallbacks()
+    end,
+
+    OnImpact = function(self, targetType, targetEntity)
+        local ok, err = pcall(NukeProjectile.OnImpact, self, targetType, targetEntity)
+        if not ok then
+            WARN("XRA_BioNuke01 OnImpact error: " .. tostring(err))
+        end
+        self:Destroy()
     end,
 
     DoTakeDamage = function(self, instigator, amount, vector, damageType)

@@ -10,6 +10,21 @@
 
 local Targeting = import('/mods/RaptorFaction/lua/RaptorTargeting.lua')
 
+---Safely checks if a unit is idle without throwing on non-existent methods
+---@param u Unit
+---@return boolean
+local function IsUnitIdle(u)
+    if not u or u.Dead or (u.BeenDestroyed and u:BeenDestroyed()) then return false end
+    if u.IsIdleState then
+        return u:IsIdleState()
+    end
+    if u.GetCommandQueue then
+        local q = u:GetCommandQueue()
+        return not q or table.empty(q)
+    end
+    return false
+end
+
 -- ---------------------------------------------------------------------------
 -- 1. PLATOON SQUAD CENTROID & REGROUPING ENGINE
 -- ---------------------------------------------------------------------------
@@ -331,7 +346,7 @@ function WolfpackProwlThread(platoon, targetPos, flankMode)
                     local allIdle = true
                     for _, u in units do
                         if u and not u.Dead and (not u.BeenDestroyed or not u:BeenDestroyed()) then
-                            if not u:IsIdle() then
+                            if not IsUnitIdle(u) then
                                 allIdle = false
                                 break
                             end
@@ -404,8 +419,9 @@ function WolfpackProwlThread(platoon, targetPos, flankMode)
                 local allOrdersDone = true
                 for _, u in units do
                     if u and not u.Dead and (not u.BeenDestroyed or not u:BeenDestroyed()) then
-                        if not u:IsIdle() then
+                        if not IsUnitIdle(u) then
                             allOrdersDone = false
+                            break
                         end
                     end
                 end
@@ -559,7 +575,7 @@ function PlatoonCohesionThread(platoon, targetPos, flankMode)
                     local allIdle = true
                     for _, u in units do
                         if u and not u.Dead and not u:BeenDestroyed() then
-                            if not u:IsIdle() then
+                            if not IsUnitIdle(u) then
                                 allIdle = false
                                 break
                             end
@@ -668,7 +684,7 @@ end
 ---@param targetPos Vector3
 function ManageRaptorAirSquad(platoon, targetPos)
     if platoon and platoon.SetFormation then
-        platoon:SetFormation('GrowthFormation')
+        platoon:SetFormation('NoFormation')
     end
     platoon:ForkThread(AirAssaultThread, targetPos)
 end
@@ -676,7 +692,7 @@ end
 function AirAssaultThread(platoon, targetPos)
     local planArmy = nil
     if platoon and platoon.SetFormation then
-        platoon:SetFormation('GrowthFormation')
+        platoon:SetFormation('NoFormation')
     end
 
     local currentAssignedPos = nil
@@ -695,14 +711,33 @@ function AirAssaultThread(platoon, targetPos)
             end
         end
 
+        -- Check if squad has bombers/gunships or is pure anti-air fighter wing
+        local hasGroundAttack = false
+        for _, u in units do
+            if u and not u.Dead and (not u.BeenDestroyed or not u:BeenDestroyed()) then
+                if EntityCategoryContains((categories.BOMBER + categories.GROUNDATTACK) - categories.ANTIAIR, u) then
+                    hasGroundAttack = true
+                    break
+                end
+            end
+        end
+
+        if not hasGroundAttack then
+            -- Pure fighter wing: prioritize hunting active enemy air squadrons!
+            local enemyAir = platoon:FindClosestUnit('Attack', 'Enemy', true, categories.AIR * categories.MOBILE)
+            if enemyAir and not enemyAir.Dead and (not enemyAir.BeenDestroyed or not enemyAir:BeenDestroyed()) then
+                targetPos = enemyAir:GetPosition()
+            end
+        end
+
         if not targetPos and planArmy then
-            targetPos = Targeting.GetWeightedRandomEnemyTarget(planArmy)
+            targetPos = Targeting.GetWeightedEnemyTarget(planArmy)
         end
 
         local allIdle = true
         for _, u in units do
-            if u and not u.Dead and not u:BeenDestroyed() then
-                if not u:IsIdle() then
+            if u and not u.Dead and (not u.BeenDestroyed or not u:BeenDestroyed()) then
+                if not IsUnitIdle(u) then
                     allIdle = false
                     break
                 end
@@ -713,7 +748,7 @@ function AirAssaultThread(platoon, targetPos)
             currentAssignedPos = targetPos
 
             -- Generate a wide aerial attack/patrol diamond around targetPos
-            local offset = 35.0
+            local offset = 40.0
             local y1 = GetSurfaceHeight(targetPos[1] + offset, targetPos[3])
             local y2 = GetSurfaceHeight(targetPos[1], targetPos[3] + offset)
             local y3 = GetSurfaceHeight(targetPos[1] - offset, targetPos[3])
@@ -724,12 +759,12 @@ function AirAssaultThread(platoon, targetPos)
             local p3 = Vector(targetPos[1] - offset, y3, targetPos[3])
             local p4 = Vector(targetPos[1], y4, targetPos[3] - offset)
 
-            platoon:Stop()
-            platoon:AggressiveMoveToLocation(targetPos)
-            platoon:Patrol(p1)
-            platoon:Patrol(p2)
-            platoon:Patrol(p3)
-            platoon:Patrol(p4)
+            IssueClearCommands(units)
+            IssueAggressiveMove(units, targetPos)
+            IssuePatrol(units, p1)
+            IssuePatrol(units, p2)
+            IssuePatrol(units, p3)
+            IssuePatrol(units, p4)
         end
 
         -- Re-evaluate target every 15-25 seconds with jitter
@@ -737,7 +772,7 @@ function AirAssaultThread(platoon, targetPos)
         if planArmy and not IsPlatoonInCombat(platoon) then
             local brain = platoon:GetBrain()
             if brain and targetPos then
-                local enemies = brain:GetUnitsAroundPoint(categories.ALLUNITS - categories.WALL, targetPos, 30.0, 'Enemy')
+                local enemies = brain:GetUnitsAroundPoint(categories.ALLUNITS - categories.WALL, targetPos, 35.0, 'Enemy')
                 if not enemies or table.empty(enemies) then
                     local airPos = platoon:GetPlatoonPosition()
                     targetPos = Targeting.GetWeightedEnemyTarget(planArmy, airPos)
@@ -786,8 +821,8 @@ function AirScoutThread(platoon, targetPos)
 
         local allIdle = true
         for _, u in units do
-            if u and not u.Dead and not u:BeenDestroyed() then
-                if not u:IsIdle() then
+            if u and not u.Dead and (not u.BeenDestroyed or not u:BeenDestroyed()) then
+                if not IsUnitIdle(u) then
                     allIdle = false
                     break
                 end
@@ -798,8 +833,8 @@ function AirScoutThread(platoon, targetPos)
             currentAssignedPos = targetPos
 
             -- High-speed recon flight: sprint directly to the target location first to scout ahead immediately!
-            platoon:Stop()
-            platoon:MoveToLocation(targetPos, false)
+            IssueClearCommands(units)
+            IssueMove(units, targetPos)
 
             -- Wide reconnaissance diamond patrol (radius 55) at high elevation to unveil fog of war
             local offset = 55.0
@@ -813,10 +848,10 @@ function AirScoutThread(platoon, targetPos)
             local p3 = Vector(targetPos[1] - offset, y3, targetPos[3])
             local p4 = Vector(targetPos[1], y4, targetPos[3] - offset)
 
-            platoon:Patrol(p1)
-            platoon:Patrol(p2)
-            platoon:Patrol(p3)
-            platoon:Patrol(p4)
+            IssuePatrol(units, p1)
+            IssuePatrol(units, p2)
+            IssuePatrol(units, p3)
+            IssuePatrol(units, p4)
         end
 
         -- Re-evaluate and scout fresh targets every 20-30 seconds
@@ -1023,8 +1058,8 @@ function ManageDiggerAmbushSquad(platoon, targetPos)
 
             local allIdle = true
             for _, u in units do
-                if u and not u.Dead and not u:BeenDestroyed() then
-                    if not u:IsIdle() then
+                if u and not u.Dead and (not u.BeenDestroyed or not u:BeenDestroyed()) then
+                    if not IsUnitIdle(u) then
                         allIdle = false
                         break
                     end

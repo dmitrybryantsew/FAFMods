@@ -872,7 +872,7 @@ bp_fly_content = """UnitBlueprint {
         },
     },
     Air = {
-        AutoLandTime = 1,
+        AutoLandTime = 0,
         BankFactor = 2.5,
         BankForward = false,
         BreakOffDistance = 8,

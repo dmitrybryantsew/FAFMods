@@ -1417,7 +1417,7 @@ save_sca_file(os.path.join(dir_xra0111, "XRA0111_Adeath01.sca"), num_frames, dur
 
 bp_xra0111 = """UnitBlueprint {
     Air = {
-        AutoLandTime = 1,
+        AutoLandTime = 0,
         BankFactor = 1.5,
         CanFly = true,
         CombatTurnSpeed = 2.0,
@@ -1901,7 +1901,7 @@ shutil.copyfile(os.path.join(dir_xra0104, "XRA0104_Adeath01.sca"), os.path.join(
 
 bp_xra0204 = """UnitBlueprint {
     Air = {
-        AutoLandTime = 1,
+        AutoLandTime = 0,
         BankFactor = 3,
         BankForward = false,
         BreakOffDistance = 36,
