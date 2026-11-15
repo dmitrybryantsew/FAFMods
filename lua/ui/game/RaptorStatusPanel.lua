@@ -160,7 +160,8 @@ function ReceiveData(data)
     lastData = data
     hasEverReceivedData = true
 
-    if data.RaptorArmy and data.HivemindName then
+    if not controls.armiesInitialized and data.RaptorArmy and data.HivemindName then
+        controls.armiesInitialized = true
         local armies = GetArmiesTable()
         if armies and armies.armiesTable and armies.armiesTable[data.RaptorArmy] then
             armies.armiesTable[data.RaptorArmy].nickname = data.HivemindName

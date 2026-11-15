@@ -146,12 +146,14 @@ function StartQueenGestationThread(queen)
             if not queen.IsStaggered and not queen.Dead then
                 local pos = queen:GetPosition()
                 -- Spawn 4 living Raptor Larvae/Swarmers and 1 Weaver Healer
+                local spawnedMinions = {}
                 for i = 1, 4 do
                     local ox = (math.random() - 0.5) * 8
                     local oz = (math.random() - 0.5) * 8
                     local unit = brain:CreateUnitNearSpot('XRA0100', pos[1] + ox, pos[3] + oz)
                     if unit then
                         CreateEmitterAtEntity(unit, army, '/mods/RaptorFaction/effects/emitters/raptor_blood_spray_01_emit.bp')
+                        table.insert(spawnedMinions, unit)
                     end
                 end
                 -- Spawn Weaver Healer
@@ -160,6 +162,13 @@ function StartQueenGestationThread(queen)
                 local healer = brain:CreateUnitNearSpot('XRA0109', pos[1] + hx, pos[3] + hz)
                 if healer then
                     CreateEmitterAtEntity(healer, army, '/mods/RaptorFaction/effects/emitters/raptor_blood_spray_01_emit.bp')
+                    IssueGuard({healer}, queen)
+                end
+                if not table.empty(spawnedMinions) then
+                    local PlatoonAI = import('/mods/RaptorFaction/lua/RaptorPlatoonAI.lua')
+                    if PlatoonAI and PlatoonAI.RegisterFieldSpawnedUnits then
+                        PlatoonAI.RegisterFieldSpawnedUnits(spawnedMinions, brain, pos)
+                    end
                 end
             end
         end
@@ -171,8 +180,7 @@ end
 function FireQueenMeteorStrike(queen)
     if not queen or queen.Dead or queen.IsStaggered then return end
     local aiBrain = queen:GetAIBrain()
-    local targetPos = Targeting.GetWeightedEnemyTarget(queen:GetArmy(), queen:GetPosition())
-
+    local targetPos = Targeting.GetWeightedEnemyTarget(queen:GetArmy(), queen:GetPosition(), true)
     if targetPos then
         Sync.RaptorAnnounce = {
             Text = "DANGER: QUEEN TITAN METEOR BOMBARDMENT DETECTED!",
@@ -332,8 +340,22 @@ function TransitionToLandQueen(skyQueen)
     end
 
     -- 4. Awaken Phase 2: Land Matriarch Queen Titan (XRA0401)
-    local landQueen = brain:CreateUnitNearSpot('XRA0401', cx, cz)
-    if landQueen then
+    LOG("* RAPTOR FACTION: Awakening Phase 2 Land Matriarch Queen Titan (XRA0401) at (" .. tostring(cx) .. ", " .. tostring(cz) .. ")")
+    local landQueen = nil
+    local okLand, errLand = pcall(function()
+        landQueen = brain:CreateUnitNearSpot('XRA0401', cx, cz)
+    end)
+    if not okLand or not landQueen or landQueen.Dead then
+        WARN("* RAPTOR FACTION: CreateUnitNearSpot failed for XRA0401: " .. tostring(errLand) .. ". Attempting CreateUnit fallback...")
+        local okFall, errFall = pcall(function()
+            landQueen = CreateUnit('xra0401', army, cx, cy, cz, 0, 0, 0)
+        end)
+        if not okFall or not landQueen or landQueen.Dead then
+            WARN("* RAPTOR FACTION: CRITICAL: Failed to spawn Land Queen Titan! Error: " .. tostring(errFall))
+        end
+    end
+
+    if landQueen and not landQueen.Dead then
         local Spawner = import('/mods/RaptorFaction/lua/RaptorSpawner.lua')
         local Stats = import('/mods/RaptorFaction/lua/RaptorStats.lua')
 
@@ -351,15 +373,18 @@ function TransitionToLandQueen(skyQueen)
             Text = "BEHOLD: THE LAND MATRIARCH QUEEN TITAN RISES FROM THE BIO-CRATER!",
             Color = 'red'
         }
+        LOG("* RAPTOR FACTION: Land Matriarch Queen Titan (XRA0401) successfully awakened!")
 
-        -- Start Phase 2 Boss Threads
-        StartQueenGestationThread(landQueen)
-        StartQueenBombardmentThread(landQueen)
-        StartQueenKineticStompThread(landQueen)
-
-        -- Order Land Queen directly into combat
-        local target = Targeting.GetWeightedEnemyTarget(army, crashPos)
-        IssueAggressiveMove({landQueen}, target)
+        -- Order Land Queen into combat along NavMesh corridor
+        local target = Targeting.GetWeightedEnemyTarget(army, crashPos, false)
+        if target then
+            local PlatoonAI = import('/mods/RaptorFaction/lua/RaptorPlatoonAI.lua')
+            local route = (PlatoonAI and PlatoonAI.GetNavCorridor and PlatoonAI.GetNavCorridor(crashPos, target, 'Land', 'center')) or { target }
+            IssueClearCommands({landQueen})
+            for _, wp in route do
+                IssueAggressiveMove({landQueen}, wp)
+            end
+        end
     end
 end
 

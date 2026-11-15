@@ -65,9 +65,9 @@ In Beyond All Reason, raptors do not leave twisted metal wreckage; they drop **b
 
 | Egg Tier | Source Unit Cost | Drop Chance | Mass Reclaim Value | Energy Value | Feature Asset |
 | :---: | :---: | :---: | :---: | :---: | :--- |
-| **Small Egg** | $\le 1,500$ Mass | $33\%$ | $100\%$ of Unit Mass | Equal to Mass | `/env/props/raptor_egg_s.bp` |
-| **Medium Egg**| $1,501 - 7,500$ Mass | $66\%$ | $66\%$ of Unit Mass | Equal to Mass | `/env/props/raptor_egg_m.bp` |
-| **Large Egg** | $> 7,500$ Mass | $100\%$ | $33\%$ of Unit Mass | Equal to Mass | `/env/props/raptor_egg_l.bp` |
+| **Small Egg** | $\le 1,500$ Mass | $33\%$ | $20\%$ of Unit Mass | Equal to Mass | `/env/props/raptor_egg_prop.bp` (Scale 0.10) |
+| **Medium Egg**| $1,501 - 7,500$ Mass | $66\%$ | $25\%$ of Unit Mass | Equal to Mass | `/env/props/raptor_egg_prop.bp` (Scale 0.15) |
+| **Large Egg** | $> 7,500$ Mass | $100\%$ | $15\%$ of Unit Mass | Equal to Mass | `/env/props/raptor_egg_prop.bp` (Scale 0.22) |
 
 ### B. Lua Egg Spawner & Decay Thread Implementation
 
@@ -76,49 +76,95 @@ Integrated into unit death scripts (`OnKilled`):
 ```lua
 ---Spawns a biological egg feature upon raptor death with a 90-second decay timer
 ---@param unit Unit
-function SpawnRaptorEgg(unit)
+function SpawnRaptorEgg(unit, forceDrop, eggCount)
+    if not unit or unit:BeenDestroyed() or unit.EggsDropped then return end
+
     local bp = unit:GetBlueprint()
-    local massCost = bp.Economy.BuildCostMass or 100
-    local size = 's'
+    local unitId = string.lower(unit:GetUnitId() or '')
+    local massCost = (bp.Economy and bp.Economy.BuildCostMass) or 100
+    local pos = unit:GetPosition()
+    if not pos then return end
+
+    local count = eggCount or 1
     local chance = 0.33
-    local reclaimMass = massCost
+    local reclaimMass = math.floor(massCost * 0.20)
+    local scale = 0.10
 
     if massCost > 7500 then
-        size = 'l'
         chance = 1.0
-        reclaimMass = massCost * 0.33
+        reclaimMass = math.floor(massCost * 0.15)
+        scale = 0.22
     elseif massCost > 1500 then
-        size = 'm'
         chance = 0.66
-        reclaimMass = massCost * 0.66
+        reclaimMass = math.floor(massCost * 0.25)
+        scale = 0.15
+    end
+
+    if unitId == 'xra0227' or (bp.CategoriesHash and bp.CategoriesHash['CARRIER']) then
+        forceDrop = true
+        count = eggCount or math.random(2, 3)
+        scale = 0.14
+        reclaimMass = math.floor(massCost * 0.25)
+    end
+
+    if forceDrop then
+        chance = 1.0
+        if scale < 0.14 then scale = 0.14 end
     end
 
     if math.random() > chance then return end
+    unit.EggsDropped = true
 
-    local pos = unit:GetPosition()
-    local eggBp = string.format('/mods/RaptorFaction/env/props/raptor_egg_%s_prop.bp', size)
-    local eggProp = CreatePropAtWorldTimes(eggBp, pos[1], pos[2], pos[3])
+    local propBp = '/mods/RaptorFaction/env/props/raptor_egg_prop.bp'
+    local perEggMass = math.max(5, math.floor(reclaimMass / count))
+    local perEggEnergy = perEggMass
 
-    if eggProp then
-        eggProp:SetMaxReclaimValues(reclaimMass, reclaimMass, 1.0)
-        eggProp:SetHealth(eggProp, 1000)
+    for i = 1, count do
+        local angle = math.random() * 6.283
+        local dist = (count > 1) and (1.0 + math.random() * 2.5) or 0
+        local x = pos[1] + math.cos(angle) * dist
+        local z = pos[3] + math.sin(angle) * dist
+        local y = GetSurfaceHeight(x, z)
+        local heading = math.random() * 6.283
+        local eggProp = CreatePropHPR(propBp, x, y, z, heading, 0, 0)
 
-        -- Fork Decay Thread: Dissolves egg in ~90 seconds
-        ForkThread(function()
-            local hp = 1000
-            while hp > 0 and not eggProp:BeenDestroyed() do
-                WaitSeconds(5.0)
-                hp = hp - 55 -- 55 HP every 5 seconds = ~90 seconds total lifespan
-                if hp <= 0 then
-                    -- Dissolve particle FX
-                    CreateEmitterAtEntity(eggProp, -1, '/mods/RaptorFaction/effects/emitters/raptor_egg_dissolve_01_emit.bp')
-                    eggProp:Destroy()
-                    break
-                else
-                    eggProp:SetHealth(eggProp, hp)
+        if eggProp then
+            eggProp:SetScale(scale)
+            eggProp:SetMaxHealth(1000)
+            eggProp:SetHealth(eggProp, 1000)
+
+            -- FAF Prop:SetMaxReclaimValues(timeMult, mass, energy)
+            eggProp:SetMaxReclaimValues(1.0, perEggMass, perEggEnergy)
+
+            -- Fork Decay Thread: Dissolves egg over 90 seconds without breaking active reclaim
+            ForkThread(function()
+                local totalSteps = 30
+                local stepInterval = 3.0
+                local decayDmg = math.ceil(1000 / totalSteps)
+
+                for s = 1, totalSteps do
+                    WaitSeconds(stepInterval)
+                    if not eggProp or eggProp:BeenDestroyed() then return end
+
+                    local curHp = eggProp:GetHealth()
+                    if not curHp or curHp <= decayDmg then
+                        if not eggProp:BeenDestroyed() then
+                            CreateEmitterAtEntity(eggProp, -1, '/mods/RaptorFaction/effects/emitters/raptor_blood_cloud_01_emit.bp'):ScaleEmitter(scale * 4.0)
+                            eggProp:Destroy()
+                        end
+                        return
+                    else
+                        eggProp:AdjustHealth(eggProp, -decayDmg)
+                        eggProp:UpdateReclaimLeft()
+                    end
                 end
-            end
-        end)
+
+                if eggProp and not eggProp:BeenDestroyed() then
+                    CreateEmitterAtEntity(eggProp, -1, '/mods/RaptorFaction/effects/emitters/raptor_blood_cloud_01_emit.bp'):ScaleEmitter(scale * 4.0)
+                    eggProp:Destroy()
+                end
+            end)
+        end
     end
 end
 ```

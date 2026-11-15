@@ -178,7 +178,7 @@ def euler_to_quat(rot_x, rot_y, rot_z):
     qw = cx * cy * cz + sx * sy * sz
     qx = sx * cy * cz - cx * sy * sz
     qy = cx * sy * cz + sx * cy * sz
-    qz = cx * cy * sz - sx * sz * cz
+    qz = cx * cy * sz - sx * sy * cz
     return (qw, qx, qy, qz)
 
 def save_sca_file(filepath, num_frames, duration, piece_names, parent_indices, frames_data):
@@ -206,6 +206,18 @@ def save_sca_file(filepath, num_frames, duration, piece_names, parent_indices, f
             names_off, links_off, anim_data_off, frame_size
         ]
         f.write(struct.pack('<4s2If5I', *header))
+
+def read_sca_bones(sca_path):
+    try:
+        with open(sca_path, 'rb') as f:
+            header = struct.unpack('<4s2If5I', f.read(36))
+            num_bones, names_off, links_off = header[4], header[5], header[6]
+            f.seek(names_off)
+            names_raw = f.read(links_off - names_off)
+            names = [n.decode('latin1') for n in names_raw.split(b'\x00') if n]
+            return names[:num_bones]
+    except Exception:
+        return None
 
 def generate_procedural_anims(pieces, walk_path, death_path, is_flying=False):
     names = [p.name for p in pieces]
@@ -294,7 +306,7 @@ NEW_UNITS = [
         "tech": "T2", "type": "AIR", "motion": "RULEUMT_Air",
         "s3o": "objects3d/raptors/raptor_dodo_air.s3o",
         "tex": "unittextures/chicken_red_s_color.dds",
-        "scale": 0.055, "hp": 480, "regen": 1.0, "speed": 15.0,
+        "scale": 0.7, "hp": 480, "regen": 1.0, "speed": 15.0,
         "mass": 140, "energy": 2800, "buildtime": 750,
         "shared_sca": None, "is_flying": True,
         "is_kamikaze": True, "kamikaze_dmg": 1400, "kamikaze_radius": 3.5,
@@ -308,7 +320,7 @@ NEW_UNITS = [
         "tech": "T3", "type": "AIR", "motion": "RULEUMT_Air",
         "s3o": "objects3d/raptors/raptor_crow.s3o",
         "tex": "unittextures/chicken_vcrimson_m_color.dds",
-        "scale": 0.065, "hp": 1850, "regen": 3.0, "speed": 22.0,
+        "scale": 0.95, "hp": 1850, "regen": 3.0, "speed": 22.0,
         "mass": 650, "energy": 14000, "buildtime": 2400,
         "shared_sca": None, "is_flying": True,
         "categories": ["AIR", "MOBILE", "ANTIAIR", "HIGHPRIAIR", "TECH3", "BUILTBYRAPTORHIVE", "RAPTOR"],
@@ -326,7 +338,7 @@ NEW_UNITS = [
         "tech": "T2", "type": "AIR", "motion": "RULEUMT_Air",
         "s3o": "objects3d/raptors/raptor_droneb.s3o",
         "tex": "unittextures/chicken_whitehc_s_color.dds",
-        "scale": 0.06, "hp": 750, "regen": 4.0, "speed": 10.0,
+        "scale": 0.85, "hp": 750, "regen": 4.0, "speed": 10.0,
         "mass": 280, "energy": 4500, "buildtime": 1100,
         "shared_sca": None, "is_flying": True, "is_healer": True,
         "categories": ["AIR", "MOBILE", "REPAIR", "ENGINEER", "TECH2", "BUILTBYRAPTORHIVE", "RAPTOR"],
@@ -339,7 +351,7 @@ NEW_UNITS = [
         "tech": "T2", "type": "AIR", "motion": "RULEUMT_Air",
         "s3o": "objects3d/raptors/raptorf1.s3o",
         "tex": "unittextures/chicken_acidgreen_l_color.dds",
-        "scale": 0.06, "hp": 1100, "regen": 2.0, "speed": 8.5,
+        "scale": 0.65, "hp": 1100, "regen": 2.0, "speed": 8.5,
         "mass": 320, "energy": 6000, "buildtime": 1400,
         "shared_sca": "XRA0205", "is_flying": True,
         "categories": ["AIR", "MOBILE", "GROUNDATTACK", "DIRECTFIRE", "TECH2", "BUILTBYRAPTORHIVE", "RAPTOR"],
@@ -357,7 +369,7 @@ NEW_UNITS = [
         "tech": "T2", "type": "AIR", "motion": "RULEUMT_Air",
         "s3o": "objects3d/raptors/raptorf1.s3o",
         "tex": "unittextures/chicken_electric_l_color.dds",
-        "scale": 0.06, "hp": 1100, "regen": 2.0, "speed": 8.5,
+        "scale": 0.65, "hp": 1100, "regen": 2.0, "speed": 8.5,
         "mass": 320, "energy": 6500, "buildtime": 1400,
         "shared_sca": "XRA0205", "is_flying": True,
         "categories": ["AIR", "MOBILE", "GROUNDATTACK", "DIRECTFIRE", "TECH2", "BUILTBYRAPTORHIVE", "RAPTOR"],
@@ -375,7 +387,7 @@ NEW_UNITS = [
         "tech": "T2", "type": "AIR", "motion": "RULEUMT_Air",
         "s3o": "objects3d/raptors/raptorf1.s3o",
         "tex": "unittextures/chicken_black_l_color.dds",
-        "scale": 0.06, "hp": 1200, "regen": 2.0, "speed": 8.5,
+        "scale": 0.65, "hp": 1200, "regen": 2.0, "speed": 8.5,
         "mass": 340, "energy": 6800, "buildtime": 1450,
         "shared_sca": "XRA0205", "is_flying": True,
         "categories": ["AIR", "MOBILE", "GROUNDATTACK", "DIRECTFIRE", "TECH2", "BUILTBYRAPTORHIVE", "RAPTOR"],
@@ -393,7 +405,7 @@ NEW_UNITS = [
         "tech": "T2", "type": "AIR", "motion": "RULEUMT_Air",
         "s3o": "objects3d/raptors/raptorf1.s3o",
         "tex": "unittextures/chicken_red_l_color.dds",
-        "scale": 0.06, "hp": 1050, "regen": 2.0, "speed": 11.0,
+        "scale": 0.65, "hp": 1050, "regen": 2.0, "speed": 11.0,
         "mass": 310, "energy": 5800, "buildtime": 1350,
         "shared_sca": "XRA0205", "is_flying": True,
         "categories": ["AIR", "MOBILE", "ANTIAIR", "TECH2", "BUILTBYRAPTORHIVE", "RAPTOR"],
@@ -411,7 +423,7 @@ NEW_UNITS = [
         "tech": "T2", "type": "AIR", "motion": "RULEUMT_Air",
         "s3o": "objects3d/raptors/raptorebomber1.s3o",
         "tex": "unittextures/chicken_electric_l_color.dds",
-        "scale": 0.06, "hp": 700, "regen": 1.5, "speed": 11.5,
+        "scale": 0.5, "hp": 700, "regen": 1.5, "speed": 11.5,
         "mass": 260, "energy": 5500, "buildtime": 1200,
         "shared_sca": "XRA0104", "is_flying": True,
         "categories": ["AIR", "MOBILE", "BOMBER", "HIGHPRIAIR", "TECH2", "BUILTBYRAPTORHIVE", "RAPTOR"],
@@ -431,7 +443,7 @@ NEW_UNITS = [
         "tech": "T2", "type": "LAND", "motion": "RULEUMT_Amphibious",
         "s3o": "objects3d/raptors/raptor_artillery_brood_small.s3o",
         "tex": "unittextures/chicken_blue_l_color.dds",
-        "scale": 0.06, "hp": 750, "regen": 1.5, "speed": 2.8,
+        "scale": 1.1, "hp": 750, "regen": 1.5, "speed": 2.8,
         "mass": 340, "energy": 3800, "buildtime": 1100,
         "shared_sca": "XRA0202", "is_flying": False,
         "categories": ["LAND", "MOBILE", "INDIRECTFIRE", "ARTILLERY", "ALLTERRAIN", "TECH2", "BUILTBYRAPTORHIVE", "RAPTOR"],
@@ -449,7 +461,7 @@ NEW_UNITS = [
         "tech": "T3", "type": "LAND", "motion": "RULEUMT_Amphibious",
         "s3o": "objects3d/raptors/raptor_artillery_electric_v2.s3o",
         "tex": "unittextures/chicken_electric_l_color.dds",
-        "scale": 0.07, "hp": 1600, "regen": 3.0, "speed": 2.4,
+        "scale": 1.2, "hp": 1600, "regen": 3.0, "speed": 2.4,
         "mass": 880, "energy": 12000, "buildtime": 2800,
         "shared_sca": "XRA0202", "is_flying": False,
         "categories": ["LAND", "MOBILE", "INDIRECTFIRE", "ARTILLERY", "ALLTERRAIN", "TECH3", "BUILTBYRAPTORHIVE", "RAPTOR"],
@@ -467,7 +479,7 @@ NEW_UNITS = [
         "tech": "T3", "type": "LAND", "motion": "RULEUMT_Amphibious",
         "s3o": "objects3d/raptors/raptor_artillery_acid_v2.s3o",
         "tex": "unittextures/chicken_acidgreen_l_color.dds",
-        "scale": 0.07, "hp": 1600, "regen": 3.0, "speed": 2.4,
+        "scale": 1.2, "hp": 1600, "regen": 3.0, "speed": 2.4,
         "mass": 880, "energy": 12000, "buildtime": 2800,
         "shared_sca": "XRA0202", "is_flying": False,
         "categories": ["LAND", "MOBILE", "INDIRECTFIRE", "ARTILLERY", "ALLTERRAIN", "TECH3", "BUILTBYRAPTORHIVE", "RAPTOR"],
@@ -485,7 +497,7 @@ NEW_UNITS = [
         "tech": "T3", "type": "LAND", "motion": "RULEUMT_Amphibious",
         "s3o": "objects3d/raptors/raptor_dodo2_electric.s3o",
         "tex": "unittextures/chicken_electric_l_color.dds",
-        "scale": 0.08, "hp": 3200, "regen": 3.0, "speed": 4.2,
+        "scale": 0.85, "hp": 3200, "regen": 3.0, "speed": 4.2,
         "mass": 750, "energy": 9000, "buildtime": 2100,
         "shared_sca": "XRA0310", "is_flying": False,
         "is_kamikaze": True, "kamikaze_dmg": 2200, "kamikaze_radius": 6.0,
@@ -501,7 +513,7 @@ NEW_UNITS = [
         "tech": "T2", "type": "LAND", "motion": "RULEUMT_Amphibious",
         "s3o": "objects3d/raptors/raptors.s3o",
         "tex": "unittextures/chicken_green_m_color.dds",
-        "scale": 0.06, "hp": 850, "regen": 2.0, "speed": 4.2,
+        "scale": 0.85, "hp": 850, "regen": 2.0, "speed": 4.2,
         "mass": 220, "energy": 2400, "buildtime": 850,
         "shared_sca": None, "is_flying": False,
         "categories": ["LAND", "MOBILE", "DIRECTFIRE", "TECH2", "BUILTBYRAPTORHIVE", "RAPTOR"],
@@ -519,7 +531,7 @@ NEW_UNITS = [
         "tech": "T3", "type": "LAND", "motion": "RULEUMT_Amphibious",
         "s3o": "objects3d/raptors/raptors2.s3o",
         "tex": "unittextures/chicken_darkgreen_m_color.dds",
-        "scale": 0.07, "hp": 2400, "regen": 4.0, "speed": 3.6,
+        "scale": 0.85, "hp": 2400, "regen": 4.0, "speed": 3.6,
         "mass": 680, "energy": 8500, "buildtime": 2200,
         "shared_sca": None, "is_flying": False,
         "categories": ["LAND", "MOBILE", "DIRECTFIRE", "SNIPER", "TECH3", "BUILTBYRAPTORHIVE", "RAPTOR"],
@@ -539,7 +551,7 @@ NEW_UNITS = [
         "tech": "T2", "type": "LAND", "motion": "RULEUMT_Amphibious",
         "s3o": "objects3d/raptors/raptor1x_spectre.s3o",
         "tex": "unittextures/chicken_yellow_m_color.dds",
-        "scale": 0.06, "hp": 450, "regen": 2.0, "speed": 4.8,
+        "scale": 0.9, "hp": 450, "regen": 2.0, "speed": 4.8,
         "mass": 180, "energy": 3200, "buildtime": 750,
         "shared_sca": "XRA0101", "is_flying": False, "is_cloaked": True,
         "categories": ["LAND", "MOBILE", "DIRECTFIRE", "CLOAK", "STEALTH", "TECH2", "BUILTBYRAPTORHIVE", "RAPTOR"],
@@ -557,7 +569,7 @@ NEW_UNITS = [
         "tech": "T3", "type": "LAND", "motion": "RULEUMT_Amphibious",
         "s3o": "objects3d/raptors/raptora_spectre.s3o",
         "tex": "unittextures/chicken_yellow_l_color.dds",
-        "scale": 0.075, "hp": 4600, "regen": 5.0, "speed": 3.4,
+        "scale": 0.9, "hp": 4600, "regen": 5.0, "speed": 3.4,
         "mass": 1100, "energy": 14000, "buildtime": 3400,
         "shared_sca": "XRA0301", "is_flying": False, "is_cloaked": True,
         "categories": ["LAND", "MOBILE", "DIRECTFIRE", "CLOAK", "STEALTH", "TECH3", "BUILTBYRAPTORHIVE", "RAPTOR"],
@@ -582,7 +594,7 @@ NEW_UNITS = [
         "tech": "T3", "type": "LAND", "motion": "RULEUMT_Amphibious",
         "s3o": "objects3d/raptors/raptors2_spectre.s3o",
         "tex": "unittextures/chicken_yellow_m_color.dds",
-        "scale": 0.07, "hp": 2200, "regen": 4.0, "speed": 3.6,
+        "scale": 0.85, "hp": 2200, "regen": 4.0, "speed": 3.6,
         "mass": 780, "energy": 9500, "buildtime": 2400,
         "shared_sca": None, "is_flying": False, "is_cloaked": True,
         "categories": ["LAND", "MOBILE", "DIRECTFIRE", "SNIPER", "CLOAK", "STEALTH", "TECH3", "BUILTBYRAPTORHIVE", "RAPTOR"],
@@ -602,7 +614,7 @@ NEW_UNITS = [
         "tech": "T3", "type": "LAND", "motion": "RULEUMT_Amphibious",
         "s3o": "objects3d/raptors/raptor_miniqueen_acid.s3o",
         "tex": "unittextures/chicken_acidgreen_l_color.dds",
-        "scale": 0.075, "hp": 19000, "regen": 10.0, "speed": 2.6,
+        "scale": 0.55, "hp": 19000, "regen": 10.0, "speed": 2.6,
         "mass": 2800, "energy": 32000, "buildtime": 7200,
         "shared_sca": "XRA0303", "is_flying": False,
         "categories": ["LAND", "MOBILE", "DIRECTFIRE", "SUBCOMMANDER", "TECH3", "BUILTBYRAPTORHIVE", "RAPTOR"],
@@ -627,7 +639,7 @@ NEW_UNITS = [
         "tech": "T3", "type": "LAND", "motion": "RULEUMT_Amphibious",
         "s3o": "objects3d/raptors/raptor_miniqueen_electric.s3o",
         "tex": "unittextures/chicken_electric_l_color.dds",
-        "scale": 0.075, "hp": 19000, "regen": 10.0, "speed": 2.6,
+        "scale": 0.55, "hp": 19000, "regen": 10.0, "speed": 2.6,
         "mass": 2800, "energy": 34000, "buildtime": 7200,
         "shared_sca": "XRA0303", "is_flying": False,
         "categories": ["LAND", "MOBILE", "DIRECTFIRE", "SUBCOMMANDER", "TECH3", "BUILTBYRAPTORHIVE", "RAPTOR"],
@@ -647,7 +659,7 @@ NEW_UNITS = [
         "tech": "T3", "type": "LAND", "motion": "RULEUMT_Amphibious",
         "s3o": "objects3d/raptors/raptor_miniqueen_fire.s3o",
         "tex": "unittextures/chicken_black_l_color.dds",
-        "scale": 0.075, "hp": 19000, "regen": 10.0, "speed": 2.6,
+        "scale": 0.55, "hp": 19000, "regen": 10.0, "speed": 2.6,
         "mass": 2800, "energy": 32000, "buildtime": 7200,
         "shared_sca": "XRA0303", "is_flying": False,
         "categories": ["LAND", "MOBILE", "DIRECTFIRE", "SUBCOMMANDER", "TECH3", "BUILTBYRAPTORHIVE", "RAPTOR"],
@@ -667,7 +679,7 @@ NEW_UNITS = [
         "tech": "T3", "type": "LAND", "motion": "RULEUMT_Amphibious",
         "s3o": "objects3d/raptors/raptor_miniqueen_healer.s3o",
         "tex": "unittextures/chicken_white_l_color.dds",
-        "scale": 0.075, "hp": 22000, "regen": 15.0, "speed": 2.6,
+        "scale": 0.55, "hp": 22000, "regen": 15.0, "speed": 2.6,
         "mass": 3200, "energy": 36000, "buildtime": 7800,
         "shared_sca": "XRA0303", "is_flying": False, "is_healer": True,
         "categories": ["LAND", "MOBILE", "DIRECTFIRE", "SUBCOMMANDER", "REPAIR", "TECH3", "BUILTBYRAPTORHIVE", "RAPTOR"],
@@ -687,7 +699,7 @@ NEW_UNITS = [
         "tech": "T3", "type": "LAND", "motion": "RULEUMT_Amphibious",
         "s3o": "objects3d/raptors/raptor_miniqueen_spectre.s3o",
         "tex": "unittextures/chicken_yellow_l_color.dds",
-        "scale": 0.075, "hp": 17000, "regen": 8.0, "speed": 2.8,
+        "scale": 0.55, "hp": 17000, "regen": 8.0, "speed": 2.8,
         "mass": 2900, "energy": 35000, "buildtime": 7500,
         "shared_sca": "XRA0303", "is_flying": False, "is_cloaked": True,
         "categories": ["LAND", "MOBILE", "DIRECTFIRE", "SUBCOMMANDER", "CLOAK", "STEALTH", "TECH3", "BUILTBYRAPTORHIVE", "RAPTOR"],
@@ -709,7 +721,7 @@ NEW_UNITS = [
         "tech": "T1", "type": "LAND", "motion": "RULEUMT_Amphibious",
         "s3o": "objects3d/raptors/raptoracidswarmer.s3o",
         "tex": "unittextures/chicken_acidgreen_s_color.dds",
-        "scale": 0.06, "hp": 210, "regen": 2.0, "speed": 4.6,
+        "scale": 1.0, "hp": 210, "regen": 2.0, "speed": 4.6,
         "mass": 65, "energy": 700, "buildtime": 240,
         "shared_sca": "XRA0101", "is_flying": False,
         "categories": ["LAND", "MOBILE", "DIRECTFIRE", "TECH1", "BUILTBYRAPTORHIVE", "RAPTOR"],
@@ -727,7 +739,7 @@ NEW_UNITS = [
         "tech": "T1", "type": "LAND", "motion": "RULEUMT_Amphibious",
         "s3o": "objects3d/raptors/raptore1.s3o",
         "tex": "unittextures/chicken_electric_s_color.dds",
-        "scale": 0.06, "hp": 220, "regen": 2.0, "speed": 4.6,
+        "scale": 1.0, "hp": 220, "regen": 2.0, "speed": 4.6,
         "mass": 70, "energy": 800, "buildtime": 250,
         "shared_sca": "XRA0101", "is_flying": False,
         "categories": ["LAND", "MOBILE", "DIRECTFIRE", "TECH1", "BUILTBYRAPTORHIVE", "RAPTOR"],
@@ -745,7 +757,7 @@ NEW_UNITS = [
         "tech": "T1", "type": "LAND", "motion": "RULEUMT_Amphibious",
         "s3o": "objects3d/raptors/s_raptor_white.s3o",
         "tex": "unittextures/chicken_blue_s_color.dds",
-        "scale": 0.06, "hp": 230, "regen": 2.0, "speed": 4.5,
+        "scale": 1.0, "hp": 230, "regen": 2.0, "speed": 4.5,
         "mass": 75, "energy": 850, "buildtime": 260,
         "shared_sca": "XRA0101", "is_flying": False,
         "categories": ["LAND", "MOBILE", "DIRECTFIRE", "TECH1", "BUILTBYRAPTORHIVE", "RAPTOR"],
@@ -816,12 +828,14 @@ for u in NEW_UNITS:
         src_dir = os.path.join(units_root, u["shared_sca"])
         src_walk = os.path.join(src_dir, f"{u['shared_sca']}_Afly.sca" if u["is_flying"] else f"{u['shared_sca']}_Awalk.sca")
         src_death = os.path.join(src_dir, f"{u['shared_sca']}_Adeath01.sca")
-        if os.path.exists(src_walk):
+        scm_bones = [p.name for p in pieces]
+        sca_bones = read_sca_bones(src_walk) if os.path.exists(src_walk) else None
+        if sca_bones and sca_bones == scm_bones:
             shutil.copyfile(src_walk, anim_walk_path)
+            if os.path.exists(src_death):
+                shutil.copyfile(src_death, anim_death_path)
         else:
             generate_procedural_anims(pieces, anim_walk_path, anim_death_path, u["is_flying"])
-        if os.path.exists(src_death):
-            shutil.copyfile(src_death, anim_death_path)
     else:
         generate_procedural_anims(pieces, anim_walk_path, anim_death_path, u["is_flying"])
 
@@ -833,25 +847,22 @@ for u in NEW_UNITS:
         weapons_bp_list.append(f"""        {{
             AboveWaterTargetsOnly = true,
             CollideFriendly = false,
-            Damage = {k_dmg},
+            Damage = 0,
             DamageFriendly = false,
-            DamageRadius = {k_rad},
-            DamageType = 'Kamikaze',
-            DisplayName = 'Suicide Bio Detonation',
+            DamageRadius = 0,
+            DamageType = 'Normal',
+            DisplayName = 'Suicide Bio Detonation Trigger',
             FireTargetLayerCapsTable = {{
                 Air = 'Land|Water|Seabed',
                 Land = 'Land|Water|Seabed',
                 Water = 'Land|Water|Seabed',
             }},
-            FiringTolerance = 2,
-            Label = 'KamikazeWeapon',
-            MaxRadius = 3,
-            MuzzleSalvoDelay = 0,
-            MuzzleSalvoSize = 1,
-            MuzzleVelocity = 0,
-            NeedPrep = true,
+            FiringTolerance = 180,
+            Label = 'Suicide',
+            MaxRadius = 4.0,
             RangeCategory = 'UWRC_DirectFire',
             RateOfFire = 1,
+            SlavedToBody = true,
             TargetCheckInterval = 0.1,
             TargetPriorities = {{
                 'COMMAND',
@@ -863,6 +874,41 @@ for u in NEW_UNITS:
             TargetRestrictDisallow = 'UNTARGETABLE',
             Turreted = false,
             WeaponCategory = 'Kamikaze',
+        }},
+        {{
+            AboveWaterTargetsOnly = true,
+            BallisticArc = 'RULEUBA_None',
+            CollideFriendly = false,
+            Damage = {k_dmg},
+            DamageFriendly = false,
+            DamageRadius = {k_rad},
+            DamageType = 'Normal',
+            DisplayName = 'Bio Detonation',
+            FireOnDeath = true,
+            FireTargetLayerCapsTable = {{
+                Air = 'Air|Land|Seabed|Water',
+                Land = 'Air|Land|Seabed|Water',
+                Water = 'Air|Land|Water',
+            }},
+            FiringTolerance = 2,
+            IgnoreIfDisabled = true,
+            Label = 'DeathWeapon',
+            ManualFire = false,
+            MaxRadius = {k_rad},
+            MuzzleVelocity = 0,
+            RackBones = {{
+                {{
+                    MuzzleBones = {{ 0 }},
+                    RackBone = 0,
+                }},
+            }},
+            RangeCategory = 'UWRC_DirectFire',
+            RateOfFire = 1,
+            SalvoSize = 1,
+            SlavedToBody = true,
+            TargetRestrictDisallow = 'UNTARGETABLE',
+            Turreted = false,
+            WeaponCategory = 'Direct Fire',
         }},""")
     elif u.get("weapons"):
         for widx, w in enumerate(u["weapons"]):
@@ -979,6 +1025,7 @@ for u in NEW_UNITS:
             BallisticArc = '{ballistic_arc}',{cannot_attack_ground}
             CollideFriendly = false,
             Damage = {w_dmg},
+            DamageFriendly = false,
             DamageRadius = {3.0 if min_r > 0 else 1.0},
             DamageType = 'Normal',
             DisplayName = '{w_name}',
@@ -1055,17 +1102,17 @@ for u in NEW_UNITS:
     air_physics = ""
     air_block = ""
     if u["is_flying"]:
-        air_physics = f"""        Elevation = 8,
-        FuelRechargeRate = 150,
-        FuelUseTime = 1500,
-        GroundElevation = 8,
+        air_physics = f"""        Elevation = 14,
+        FuelRechargeRate = 0,
+        FuelUseTime = 0,
+        GroundElevation = 14,
         MaxSpeedSizeControl = 0.3,"""
 
         cats = u["categories"]
         if "ANTIAIR" in cats and "BOMBER" not in cats:
             if u.get("tech") == "T3":
                 air_block = f"""    Air = {{
-        AutoLandTime = 0,
+        AutoLandTime = -1,
         BankFactor = 4.0,
         BankForward = false,
         BreakOffDistance = 10,
@@ -1092,7 +1139,7 @@ for u in NEW_UNITS:
 """
             else:
                 air_block = f"""    Air = {{
-        AutoLandTime = 0,
+        AutoLandTime = -1,
         BankFactor = 0.4,
         BankForward = false,
         CanFly = true,
@@ -1122,7 +1169,7 @@ for u in NEW_UNITS:
 """
         elif "BOMBER" in cats:
             air_block = f"""    Air = {{
-        AutoLandTime = 0,
+        AutoLandTime = -1,
         BankFactor = 3,
         BankForward = false,
         BreakOffDistance = 36,
@@ -1152,7 +1199,7 @@ for u in NEW_UNITS:
 """
         elif "KAMIKAZE" in cats:
             air_block = f"""    Air = {{
-        AutoLandTime = 0,
+        AutoLandTime = -1,
         BankFactor = 3.5,
         BankForward = false,
         BreakOffDistance = 5,
@@ -1179,7 +1226,7 @@ for u in NEW_UNITS:
 """
         else:
             air_block = f"""    Air = {{
-        AutoLandTime = 0,
+        AutoLandTime = -1,
         BankFactor = 0.4,
         BankForward = false,
         CanFly = true,
@@ -1401,56 +1448,110 @@ for u in NEW_UNITS:
 
     # 6. Script Generation
     script_class = "CAirUnit" if u["is_flying"] else "CWalkingLandUnit"
-    base_import = "from '/lua/cybranunits.lua' import CAirUnit" if u["is_flying"] else "from '/lua/cybranunits.lua' import CWalkingLandUnit"
-    weapon_import = "from '/lua/cybranweapons.lua' import CDFLaserHeavyWeapon"
+    base_import = f"import('/lua/cybranunits.lua').{script_class}"
+    weapon_import = "import('/lua/cybranweapons.lua').CDFLaserHeavyWeapon"
     weapon_class = "CDFLaserHeavyWeapon"
     weapon_table = f"""        MainGun1 = ClassWeapon({weapon_class}) {{}},
         MainGun2 = ClassWeapon({weapon_class}) {{}},
         KamikazeWeapon = ClassWeapon({weapon_class}) {{}},"""
 
     if "BOMBER" in u["categories"]:
-        weapon_import = "from '/lua/sim/defaultweapons.lua' import DefaultProjectileWeapon"
+        weapon_import = "import('/lua/sim/defaultweapons.lua').DefaultProjectileWeapon"
         weapon_class = "DefaultProjectileWeapon"
         weapon_table = """        Bomb = ClassWeapon(DefaultProjectileWeapon) {},"""
 
-    kamikaze_code = ""
     if u.get("is_kamikaze"):
-        kamikaze_code = f"""
-    OnKilled = function(self, instigator, type, overkillRatio)
-        local pos = self:GetPosition()
-        DamageArea(self, pos, {u.get('kamikaze_radius', 4.0)}, {u.get('kamikaze_dmg', 1000)}, 'Kamikaze', true, false)
-        {script_class}.OnKilled(self, instigator, type, overkillRatio)
-    end,
-"""
-    healer_code = ""
-    if u.get("is_healer"):
-        healer_code = """
-    OnStopBeingBuilt = function(self, builder, layer)
-        """ + script_class + """.OnStopBeingBuilt(self, builder, layer)
-        self:ForkThread(self.HealerAuraThread)
-    end,
+        script_content = f"""local {script_class} = import('/lua/cybranunits.lua').{script_class}
+local Weapon = import('/lua/sim/weapon.lua').Weapon
+local DamageArea = DamageArea
+local CreateEmitterAtEntity = CreateEmitterAtEntity
+local ForkThread = ForkThread
+local WaitTicks = WaitTicks
+local IsDestroyed = IsDestroyed
 
-    HealerAuraThread = function(self)
-        while not self.Dead do
-            local pos = self:GetPosition()
-            local units = GetUnitsInRect(Rect(pos[1] - 15, pos[3] - 15, pos[1] + 15, pos[3] + 15))
-            if units then
-                for _, u in units do
-                    if u and not u.Dead and u:GetArmy() == self:GetArmy() and u != self then
-                        local curHp = u:GetHealth()
-                        local maxHp = u:GetMaxHealth()
-                        if curHp < maxHp then
-                            u:AdjustHealth(self, 25)
-                        end
-                    end
-                end
-            end
-            WaitSeconds(1)
+local DeathEffects = {{
+    '/mods/RaptorFaction/effects/emitters/raptor_blood_spray_01_emit.bp',
+    '/mods/RaptorFaction/effects/emitters/raptor_flesh_chunks_01_emit.bp',
+    '/mods/RaptorFaction/effects/emitters/raptor_blood_cloud_01_emit.bp',
+}}
+
+local SuicideWeapon = ClassWeapon(Weapon) {{
+    OnFire = function(self)
+        local unit = self.unit
+        if not unit.Dead and not unit.Detonated then
+            unit:Kill()
         end
     end,
-"""
+}}
 
-    script_content = f"""local {script_class} = {base_import}
+local DeathWeapon = ClassWeapon(Weapon) {{
+    OnCreate = function(self)
+        Weapon.OnCreate(self)
+        self:SetWeaponEnabled(false)
+        self:ChangeMaxRadius(self:GetDamageTable().DamageRadius)
+    end,
+
+    Fire = function(self)
+        local unit = self.unit
+        if not unit or unit.Detonated then return end
+        unit.Detonated = true
+
+        local position = unit:GetPosition()
+        local damageTable = self:GetDamageTable()
+        local radius = damageTable.DamageRadius or {u.get('kamikaze_radius', 4.0)}
+        local damage = damageTable.DamageAmount or {u.get('kamikaze_dmg', 1000)}
+
+        DamageArea(unit, position, radius, damage, 'Normal', false)
+
+        local army = unit.Army
+        for _, emit in DeathEffects do
+            CreateEmitterAtEntity(unit, army, emit):ScaleEmitter(2.5)
+        end
+
+        unit:PlayUnitSound('Destroyed')
+        unit:Destroy()
+    end,
+}}
+
+---@class {uid} : {script_class}
+{uid} = ClassUnit({script_class}) {{
+    Weapons = {{
+        Suicide = ClassWeapon(SuicideWeapon) {{}},
+        DeathWeapon = ClassWeapon(DeathWeapon) {{}},
+    }},
+
+    OnProductionPaused = function(self)
+        local weapon = self:GetWeaponByLabel('Suicide')
+        if weapon then
+            weapon:FireWeapon()
+        elseif not self.Dead then
+            self:Kill()
+        end
+    end,
+
+    DoDeathWeapon = function(self)
+        if self:IsBeingBuilt() then return end
+        {script_class}.DoDeathWeapon(self)
+    end,
+
+    OnKilled = function(self, instigator, type, overkillRatio)
+        if not self.Detonated then
+            local deathWeapon = self:GetWeaponByLabel('DeathWeapon')
+            if deathWeapon then
+                deathWeapon:Fire()
+            end
+        end
+        {script_class}.OnKilled(self, instigator, type, overkillRatio)
+    end,
+
+    CreateDestructionEffects = function(self, overKillRatio)
+    end,
+}}
+
+TypeClass = {uid}
+"""
+    else:
+        script_content = f"""local {script_class} = {base_import}
 local {weapon_class} = {weapon_import}
 
 ---@class {uid} : {script_class}
@@ -1458,7 +1559,6 @@ local {weapon_class} = {weapon_import}
     Weapons = {{
 {weapon_table}
     }},
-{kamikaze_code}
 {healer_code}
 }}
 

@@ -1,0 +1,122 @@
+EmitterBlueprint {
+    BlueprintId = 'raptor_flesh_chunks_01',
+    Lifetime = 1.20,
+    Repeattime = 1.20,
+    TextureFramecount = 1.00,
+    Blendmode = 0.00,
+    LocalVelocity = false,
+    LocalAcceleration = false,
+    Gravity = false,
+    AlignRotation = false,
+    AlignToBone = false,
+    Flat = false,
+    LODCutoff = 250.00,
+    EmitIfVisible = true,
+    CatchupEmit = true,
+    CreateIfVisible = false,
+    SnapToWaterline = false,
+    OnlyEmitOnWater = false,
+    InterpolateEmission = true,
+    TextureStripcount = 16.00,
+    SortOrder = 0.00,
+    Texture = '/textures/particles/debris_alpha_02.dds',
+    RampTexture = '/textures/particles/ramp_red_02.dds',
+    XDirectionCurve = {
+        XRange = 1.20,
+        Keys = {
+            { x=0.60, y=0.00, z=0.45 },
+        },
+    },
+    YDirectionCurve = {
+        XRange = 1.20,
+        Keys = {
+            { x=0.60, y=0.75, z=0.25 },
+        },
+    },
+    ZDirectionCurve = {
+        XRange = 1.20,
+        Keys = {
+            { x=0.60, y=0.00, z=0.45 },
+        },
+    },
+    EmitRateCurve = {
+        XRange = 1.20,
+        Keys = {
+            { x=0.05, y=18.00, z=0.00 },
+            { x=0.20, y=0.00, z=0.00 },
+        },
+    },
+    LifetimeCurve = {
+        XRange = 1.20,
+        Keys = {
+            { x=0.60, y=1.00, z=0.20 },
+        },
+    },
+    VelocityCurve = {
+        XRange = 1.20,
+        Keys = {
+            { x=0.10, y=5.00, z=1.80 },
+            { x=0.80, y=0.20, z=0.00 },
+        },
+    },
+    XAccelCurve = {
+        XRange = 1.20,
+        Keys = {
+            { x=0.60, y=0.00, z=0.00 },
+        },
+    },
+    YAccelCurve = {
+        XRange = 1.20,
+        Keys = {
+            { x=0.60, y=-0.70, z=0.00 },
+        },
+    },
+    ZAccelCurve = {
+        XRange = 1.20,
+        Keys = {
+            { x=0.60, y=0.00, z=0.00 },
+        },
+    },
+    StartSizeCurve = {
+        XRange = 1.20,
+        Keys = {
+            { x=0.10, y=0.25, z=0.10 },
+        },
+    },
+    EndSizeCurve = {
+        XRange = 1.20,
+        Keys = {
+            { x=0.90, y=0.25, z=0.10 },
+        },
+    },
+    InitialRotationCurve = {
+        XRange = 1.20,
+        Keys = {
+            { x=0.60, y=180.00, z=180.00 },
+        },
+    },
+    RotationRateCurve = {
+        XRange = 1.20,
+        Keys = {
+            { x=0.60, y=90.00, z=90.00 },
+        },
+    },
+    FrameRateCurve = {
+        XRange = 1.20,
+        Keys = {
+            { x=0.60, y=0.00, z=0.00 },
+        },
+    },
+    TextureSelectionCurve = {
+        XRange = 1.20,
+        Keys = {
+            { x=0.60, y=8.00, z=16.00 },
+        },
+    },
+    RampSelectionCurve = {
+        XRange = 1.20,
+        Keys = {
+            { x=0.60, y=1.00, z=1.00 },
+        },
+    },
+}

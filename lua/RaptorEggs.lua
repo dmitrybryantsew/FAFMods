@@ -18,28 +18,26 @@ function SpawnRaptorEgg(unit, forceDrop, eggCount)
     if not unit or unit:BeenDestroyed() or unit.EggsDropped then return end
 
     local bp = unit:GetBlueprint()
-    local unitId = unit:GetUnitId()
+    local unitId = string.lower(unit:GetUnitId() or '')
     local massCost = (bp.Economy and bp.Economy.BuildCostMass) or 100
     local pos = unit:GetPosition()
     if not pos then return end
 
     local count = eggCount or 1
     local chance = 0.33
-    local reclaimMass = massCost
-    local reclaimEnergy = (bp.Economy and bp.Economy.BuildCostEnergy) or massCost
+    -- Base mass drop reduced from 100% to 20% of unit mass for standard swarmers
+    local reclaimMass = math.floor(massCost * 0.20)
     local scale = 0.10
 
     if massCost > 7500 then
-        -- Large Egg (Bosses, T3 Apex, Matriarchs)
+        -- Large Egg (Bosses, T3 Apex, Matriarchs): reduced from 33% to 15% (e.g. 4,200 mass for Queen instead of 105,600)
         chance = 1.0
-        reclaimMass = math.floor(massCost * 0.33)
-        reclaimEnergy = math.floor(reclaimEnergy * 0.33)
+        reclaimMass = math.floor(massCost * 0.15)
         scale = 0.22
     elseif massCost > 1500 then
-        -- Medium Egg (T2 Crawlers, Bio-Artillery, Gunships)
+        -- Medium Egg (T2 Crawlers, Bio-Artillery, Gunships): reduced from 66% to 25%
         chance = 0.66
-        reclaimMass = math.floor(massCost * 0.66)
-        reclaimEnergy = math.floor(reclaimEnergy * 0.66)
+        reclaimMass = math.floor(massCost * 0.25)
         scale = 0.15
     end
 
@@ -48,7 +46,7 @@ function SpawnRaptorEgg(unit, forceDrop, eggCount)
         forceDrop = true
         count = eggCount or math.random(2, 3)
         scale = 0.14
-        reclaimMass = math.floor(massCost * 0.75)
+        reclaimMass = math.floor(massCost * 0.25)
     end
 
     if forceDrop then
@@ -63,8 +61,9 @@ function SpawnRaptorEgg(unit, forceDrop, eggCount)
     unit.EggsDropped = true
 
     local propBp = '/mods/RaptorFaction/env/props/raptor_egg_prop.bp'
-    local perEggMass = math.max(10, math.floor(reclaimMass / count))
-    local perEggEnergy = math.max(20, math.floor(reclaimEnergy / count))
+    local perEggMass = math.max(5, math.floor(reclaimMass / count))
+    -- Energy reclaim is matched to mass so engine reclaim duration is never bloated by huge energy costs
+    local perEggEnergy = perEggMass
 
     for i = 1, count do
         local angle = math.random() * 6.283
@@ -77,23 +76,42 @@ function SpawnRaptorEgg(unit, forceDrop, eggCount)
 
         if eggProp then
             eggProp:SetScale(scale)
-            eggProp:SetMaxReclaimValues(perEggMass, perEggEnergy, 1.0)
+            eggProp:SetMaxHealth(1000)
             eggProp:SetHealth(eggProp, 1000)
 
-            -- 90-Second Rotting Decay Coroutine
+            -- FAF Prop:SetMaxReclaimValues signature: (timeMult, mass, energy)
+            -- timeMult = 1.0 ensures standard, responsive FAF reclamation duration
+            eggProp:SetMaxReclaimValues(1.0, perEggMass, perEggEnergy)
+
+            -- 90-Second Rotting Decay Coroutine:
+            -- Smoothly rots egg health down over 90 seconds (10 steps x 9 seconds).
+            -- Uses AdjustHealth so active engineer reclamation progress is NEVER overwritten/reset.
             ForkThread(function()
-                local hp = 1000
-                while hp > 0 and not eggProp:BeenDestroyed() do
-                    WaitSeconds(5.0)
-                    if not eggProp or eggProp:BeenDestroyed() then break end
-                    hp = hp - 55 -- Loses 55 HP every 5 seconds (~90 seconds total lifetime)
-                    if hp <= 0 then
-                        CreateEmitterAtEntity(eggProp, -1, '/mods/RaptorFaction/effects/emitters/raptor_blood_cloud_01_emit.bp'):ScaleEmitter(0.8)
-                        eggProp:Destroy()
-                        break
+                local totalSteps = 10
+                local stepInterval = 9.0 -- 10 steps * 9.0s = 90.0s lifetime
+                local decayDmg = math.ceil(1000 / totalSteps) -- 100 HP per interval
+
+                for s = 1, totalSteps do
+                    WaitSeconds(stepInterval)
+                    if not eggProp or eggProp:BeenDestroyed() then return end
+
+                    local curHp = eggProp:GetHealth()
+                    if not curHp or curHp <= decayDmg then
+                        -- Egg fully rotted away: dissolve effect and clean destruction
+                        if not eggProp:BeenDestroyed() then
+                            CreateEmitterAtEntity(eggProp, -1, '/mods/RaptorFaction/effects/emitters/raptor_blood_cloud_01_emit.bp'):ScaleEmitter(scale * 4.0)
+                            eggProp:Destroy()
+                        end
+                        return
                     else
-                        eggProp:SetHealth(eggProp, hp)
+                        eggProp:AdjustHealth(eggProp, -decayDmg)
+                        eggProp:UpdateReclaimLeft()
                     end
+                end
+
+                if eggProp and not eggProp:BeenDestroyed() then
+                    CreateEmitterAtEntity(eggProp, -1, '/mods/RaptorFaction/effects/emitters/raptor_blood_cloud_01_emit.bp'):ScaleEmitter(scale * 4.0)
+                    eggProp:Destroy()
                 end
             end)
         end

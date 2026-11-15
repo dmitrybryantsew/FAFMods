@@ -27,10 +27,7 @@ UnitBlueprint {
     Categories = {
         'PRODUCTSC1',
         'SELECTABLE',
-        'BUILTBYTIER1ENGINEER',
-        'BUILTBYTIER2ENGINEER',
-        'BUILTBYTIER3ENGINEER',
-        'CYBRAN',
+        'COMMAND',
         'RAPTOR',
         'MOBILE',
         'LAND',
@@ -160,7 +157,7 @@ UnitBlueprint {
             DamageType = 'Normal',
             DisplayName = 'Titanic Roar Plasma',
             FireTargetLayerCapsTable = {
-                Land = 'Land|Water|Seabed',
+                Land = 'Land|Water',
                 Water = 'Land|Water|Seabed',
             },
             FiringTolerance = 2,
@@ -228,7 +225,7 @@ UnitBlueprint {
             DamageType = 'Normal',
             DisplayName = 'Crushing Scythe Cleave',
             FireTargetLayerCapsTable = {
-                Land = 'Land|Water|Seabed',
+                Land = 'Land|Water',
                 Water = 'Land|Water|Seabed',
             },
             FiringTolerance = 2,

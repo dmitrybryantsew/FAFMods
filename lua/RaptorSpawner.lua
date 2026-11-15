@@ -115,6 +115,14 @@ function GetActiveQueen()
     return ActiveQueen
 end
 
+function GetQueensKilled()
+    return QueensKilled
+end
+
+function IsEndlessMode()
+    return (Config and Config.Endless) or false
+end
+
 -- Unit Tiers mapped by TechAnger (Mobile Pack Attackers)
 local UnitRoster = {
     T1_Basic = {
@@ -173,6 +181,334 @@ local SpireRoster = {
     },
 }
 
+-- Specialized Aerial Swarm Rosters for Hives situated on Hills / Mountains / Cliffs
+local AirRoster = {
+    T1 = {
+        'XRA0115', -- Biological T1 Air Swarm Fighter
+        'XRA0115', -- (Weighted)
+        'XRA0104', -- Biological Acid Carpet Bomber
+        'XRA0104', -- (Weighted)
+        'XRA0111', -- High-Speed Biological Air Scout
+    },
+    T2 = {
+        'XRA0205', -- Hovering Predator Gunship
+        'XRA0204', -- Brood Cluster Bomber
+        'XRA0213', -- Air Dive-Bomb Suicide Tick
+        'XRA0216', -- Heavy Corrosive Acid Gunship
+        'XRA0218', -- Thermal Napalm Fire Gunship
+        'XRA0219', -- Anti-Air Interceptor Gunship
+        'XRA0224', -- EMP Disruption Carpet Bomber
+        'XRA0227', -- Bio-Zeppelin Blimpy (Living Brood Dodo Bomber)
+        'XRA0115', -- Air Swarm Fighter
+        'XRA0104', -- Acid Carpet Bomber
+        'XRA0111', -- High-Speed Biological Air Scout
+    },
+    T3 = {
+        'XRA0314', -- Heavy Air Superiority Raptor
+        'XRA0227', -- Bio-Zeppelin Blimpy Carrier & Dodo Bomber
+        'XRA0205', -- Hovering Predator Gunship
+        'XRA0216', -- Heavy Corrosive Acid Gunship
+        'XRA0224', -- EMP Disruption Carpet Bomber
+        'XRA0204', -- Brood Cluster Bomber
+        'XRA0314', -- (Weighted)
+        'XRA0115', -- Biological T1 Air Swarm Fighter
+        'XRA0111', -- High-Speed Biological Air Scout
+    },
+}
+
+---Constructs an air-only unit pool dynamically tailored to Tech Anger and player threats
+---@param techAnger number
+---@param threatProfile table
+---@return table pool
+local function GetAirUnitPool(techAnger, threatProfile)
+    local base = AirRoster.T1
+    if techAnger > 60 then
+        base = AirRoster.T3
+    elseif techAnger > 25 then
+        base = AirRoster.T2
+    end
+
+    local pool = {}
+    for _, bp in base do
+        table.insert(pool, bp)
+    end
+
+    if threatProfile.AirThreat then
+        table.insert(pool, 'XRA0115')
+        table.insert(pool, 'XRA0219')
+        table.insert(pool, 'XRA0314')
+    end
+
+    if threatProfile.TurtleThreat then
+        table.insert(pool, 'XRA0224')
+        table.insert(pool, 'XRA0204')
+        table.insert(pool, 'XRA0227')
+    end
+
+    if threatProfile.ExpThreat then
+        table.insert(pool, 'XRA0216')
+        table.insert(pool, 'XRA0205')
+        table.insert(pool, 'XRA0314')
+    end
+
+    return pool
+end
+
+---Evaluates whether a Hive is situated on a cliff, mountain peak, steep hill, or an unpathable/isolated plateau
+---where ground units cannot traverse off the terrain to reach enemies.
+---@param hive Unit
+---@param brain AIBrain
+---@param targetPos Vector (optional)
+---@return boolean isCliffBound
+---@return string reason
+---@return table details
+function IsHiveOnCliffOrHill(hive, brain, targetPos)
+    if not hive or hive.Dead then return false, 'InvalidHive', {} end
+
+    -- Check cached status if already permanently identified as cliff-bound
+    if hive.IsAirOnly and hive.AirOnlyReason and hive.AirOnlyReason ~= 'LandUnitsStacked' then
+        return true, hive.AirOnlyReason, { Cached = true }
+    end
+
+    local pos = hive:GetPosition()
+    if not pos then return false, 'NoPosition', {} end
+    local hx, hy, hz = pos[1], pos[2], pos[3]
+    local army = brain and brain:GetArmyIndex() or hive:GetArmy()
+
+    -- 1. STACKING WATCHDOG: Check if previous waves generated ground units that are stuck within 14 units
+    local nearbyLand = brain and brain:GetUnitsAroundPoint(categories.LAND * categories.MOBILE, pos, 14, 'Ally')
+    if nearbyLand then
+        local curTime = GetGameTimeSeconds()
+        local stuckUnits = {}
+        for _, u in nearbyLand do
+            if u and not u.Dead and (not u.BeenDestroyed or not u:BeenDestroyed()) then
+                if u.RaptorSpawnTime and (curTime - u.RaptorSpawnTime > 25) then
+                    table.insert(stuckUnits, u)
+                end
+            end
+        end
+
+        if table.getn(stuckUnits) >= 4 then
+            -- Purge the trapped units so they don't lag or consume unit cap
+            for _, u in stuckUnits do
+                if u and not u.Dead then
+                    CreateEmitterAtEntity(u, army, '/mods/RaptorFaction/effects/emitters/raptor_blood_cloud_01_emit.bp'):ScaleEmitter(1.2)
+                    u:Destroy()
+                end
+            end
+            return true, 'LandUnitsStacked', { StuckCount = table.getn(stuckUnits) }
+        end
+    end
+
+    -- 2. FAF NAV MESH CONNECTIVITY: Check if terrain is unpathable or disconnected from players
+    local okNav, NavUtils = pcall(import, '/lua/sim/NavUtils.lua')
+    if okNav and NavUtils then
+        if not NavUtils.IsGenerated() then
+            pcall(NavUtils.Generate)
+        end
+
+        if NavUtils.IsGenerated() then
+            local hiveLabel = NavUtils.GetLabel('Land', pos)
+
+            -- 2A. Position itself is on unpathable cliff terrain
+            if not hiveLabel or hiveLabel == -1 then
+                return true, 'UnpathableTerrain', { Label = hiveLabel }
+            end
+
+            -- 2B. Isolated small plateau / ledge (< 0.05 km²)
+            local meta = NavUtils.GetLabelMetadata(hiveLabel)
+            if meta and meta.Area and meta.Area < 0.05 then
+                return true, 'IsolatedSmallPlateau', { Area = meta.Area }
+            end
+
+            -- 2C. Can this land label path to any enemy player base?
+            local enemyDestinations = {}
+            if targetPos then
+                table.insert(enemyDestinations, targetPos)
+            end
+
+            if ArmyBrains then
+                for aIdx, b in ArmyBrains do
+                    if b and not b:IsDefeated() and (aIdx ~= army) and not ArmyIsCivilian(aIdx) then
+                        local sx, sz = b:GetArmyStartPos()
+                        if sx and sz and (sx ~= 0 or sz ~= 0) then
+                            table.insert(enemyDestinations, { sx, GetSurfaceHeight(sx, sz), sz })
+                        end
+                    end
+                end
+            end
+
+            local canPathToAny = false
+            for _, dest in enemyDestinations do
+                if NavUtils.CanPathTo('Land', pos, dest) then
+                    canPathToAny = true
+                    break
+                end
+            end
+
+            if table.getn(enemyDestinations) > 0 and not canPathToAny then
+                return true, 'NoLandPathToEnemy', { DestCount = table.getn(enemyDestinations) }
+            end
+        end
+    end
+
+    -- 3. LOCAL TERRAIN SLOPE GRADIENT: Check if hive is placed on a steep incline
+    local hCenter = GetTerrainHeight(hx, hz)
+    local testDist = 5.0
+    local hN = GetTerrainHeight(hx, hz + testDist)
+    local hS = GetTerrainHeight(hx, hz - testDist)
+    local hE = GetTerrainHeight(hx + testDist, hz)
+    local hW = GetTerrainHeight(hx - testDist, hz)
+
+    local slopeN = math.abs(hN - hCenter) / testDist
+    local slopeS = math.abs(hS - hCenter) / testDist
+    local slopeE = math.abs(hE - hCenter) / testDist
+    local slopeW = math.abs(hW - hCenter) / testDist
+    local maxLocalSlope = math.max(slopeN, slopeS, slopeE, slopeW)
+
+    if maxLocalSlope >= 0.45 then
+        return true, 'SteepCliffSlope', { MaxLocalSlope = maxLocalSlope }
+    end
+
+    -- 4. RADIAL CLIFF PERIMETER RAYCASTING: Check if surrounded by cliffs in radial directions
+    local numRays = 8
+    local blockedDirections = 0
+    local totalHeightDrop = 0.0
+    local rayDistance = 28.0
+    local stepSize = 4.0
+
+    for i = 1, numRays do
+        local angle = (i - 1) * (2 * math.pi / numRays)
+        local dirX = math.cos(angle)
+        local dirZ = math.sin(angle)
+        local rayBlocked = false
+        local prevH = hCenter
+
+        local dist = stepSize
+        while dist <= rayDistance do
+            local rx = hx + dirX * dist
+            local rz = hz + dirZ * dist
+            local curH = GetTerrainHeight(rx, rz)
+            local stepSlope = math.abs(curH - prevH) / stepSize
+
+            if stepSlope >= 0.65 then
+                rayBlocked = true
+                break
+            end
+
+            local tType = GetTerrainType(rx, rz)
+            if tType and tType.Blocking then
+                rayBlocked = true
+                break
+            end
+
+            prevH = curH
+            dist = dist + stepSize
+        end
+
+        local edgeH = GetTerrainHeight(hx + dirX * rayDistance, hz + dirZ * rayDistance)
+        totalHeightDrop = totalHeightDrop + (hCenter - edgeH)
+
+        if rayBlocked then
+            blockedDirections = blockedDirections + 1
+        end
+    end
+
+    local avgDrop = totalHeightDrop / numRays
+
+    -- If 6 or more out of 8 directions (75%+) are impassable cliffs
+    if blockedDirections >= 6 then
+        return true, 'RadialCliffEncirclement', { BlockedRays = blockedDirections, AvgDrop = avgDrop }
+    end
+
+    -- Elevated mountain peak with severe drop-offs
+    if avgDrop >= 6.0 and blockedDirections >= 4 then
+        return true, 'MountainPeakSummit', { BlockedRays = blockedDirections, AvgDrop = avgDrop }
+    end
+
+    return false, 'PathableTerrain', { MaxLocalSlope = maxLocalSlope, BlockedRays = blockedDirections, AvgDrop = avgDrop }
+end
+
+---Registers a Hive into active tracking and evaluates terrain for Air-Only mutation
+---@param hive Unit
+---@param brain AIBrain
+function RegisterHive(hive, brain)
+    if not hive or hive.Dead then return end
+    ActiveBurrows[hive:GetEntityId()] = hive
+    local isCliff, reason = IsHiveOnCliffOrHill(hive, brain)
+    if isCliff then
+        hive.IsAirOnly = true
+        hive.AirOnlyReason = reason
+        local pos = hive:GetPosition()
+        LOG(string.format("* RAPTOR FACTION: Hive %s germinated on CLIFF/HILL (%s) at (%.1f, %.1f) - Set to AIR-ONLY!",
+            tostring(hive:GetEntityId()), reason, pos[1], pos[3]))
+        if not hive.AirEmitterCreated then
+            hive.AirEmitterCreated = true
+            CreateEmitterAtEntity(hive, hive:GetArmy(), '/mods/RaptorFaction/effects/emitters/raptor_bio_smoke_01_emit.bp'):ScaleEmitter(2.0)
+        end
+    end
+end
+
+---Debug helper: Inspect and re-evaluate terrain for a specific hive
+---@param hive Unit
+---@return table info
+function CheckHiveTerrain(hive)
+    if not hive or hive.Dead then return { Error = "Invalid or dead hive" } end
+    local brain = ArmyBrains[RaptorArmy]
+    local targetPos = Targeting.GetWeightedEnemyTarget(RaptorArmy, hive:GetPosition())
+    local isCliff, reason, details = IsHiveOnCliffOrHill(hive, brain, targetPos)
+    local pos = hive:GetPosition()
+    local res = {
+        EntityId = hive:GetEntityId(),
+        Position = pos,
+        IsCliffBound = isCliff,
+        Reason = reason,
+        IsAirOnly = hive.IsAirOnly or false,
+        Details = details,
+    }
+    LOG(string.format("* RAPTOR FACTION: CheckHiveTerrain: Hive %s at (%.1f, %.1f) -> IsCliff=%s (Reason=%s)",
+        tostring(hive:GetEntityId()), pos[1], pos[3], tostring(isCliff), tostring(reason)))
+    return res
+end
+
+---Debug helper: Evaluate all active hives across the map and log diagnostics
+---@return table results
+function CheckAllHives()
+    local results = {}
+    LOG("* RAPTOR FACTION: ==================== CHECKING ALL HIVES TERRAIN ====================")
+    for id, hive in ActiveBurrows do
+        if hive and not hive.Dead then
+            local r = CheckHiveTerrain(hive)
+            table.insert(results, r)
+        end
+    end
+    LOG(string.format("* RAPTOR FACTION: Checked %d active hives.", table.getn(results)))
+    LOG("* RAPTOR FACTION: =====================================================================")
+    return results
+end
+
+---Diagnostic helper: Simulates whether an arbitrary map coordinate (x, z) would be classified as Cliff/Hill (Air-Only)
+---@param x number
+---@param z number
+---@param targetX number (optional)
+---@param targetZ number (optional)
+---@return boolean isCliff
+---@return string reason
+---@return table details
+function SimulatePosition(x, z, targetX, targetZ)
+    local targetPos = (targetX and targetZ) and { targetX, GetSurfaceHeight(targetX, targetZ), targetZ } or nil
+    local mockHive = {
+        Dead = false,
+        GetPosition = function() return { x, GetSurfaceHeight(x, z), z } end,
+        GetArmy = function() return RaptorArmy or 1 end,
+        GetEntityId = function() return "SIMULATED" end,
+    }
+    local brain = RaptorArmy and ArmyBrains[RaptorArmy] or nil
+    local isCliff, reason, details = IsHiveOnCliffOrHill(mockHive, brain, targetPos)
+    LOG(string.format("* RAPTOR FACTION: SimulatePosition(%.1f, %.1f) -> IsCliff=%s, Reason=%s", x, z, tostring(isCliff), reason))
+    return isCliff, reason, details
+end
+
 ---Initializes and launches the Raptor Swarm Defense engine
 ---@param armyIndex number
 ---@param difficulty string
@@ -180,6 +516,12 @@ function StartRaptorDefense(armyIndex, difficulty)
     RaptorArmy = armyIndex
     CurrentDifficulty = difficulty or 'normal'
     local baseConfig = DifficultyParams[CurrentDifficulty] or DifficultyParams['normal']
+
+    -- Ensure FAF NavMesh is generated early for high-speed corridor pathing
+    local okNav, NavUtils = pcall(import, '/lua/sim/NavUtils.lua')
+    if okNav and NavUtils and not NavUtils.IsGenerated() then
+        pcall(NavUtils.Generate)
+    end
 
     local brain = GetArmyBrain(armyIndex)
     local curNick = (brain and brain.Nickname) or ""
@@ -211,6 +553,7 @@ function StartRaptorDefense(armyIndex, difficulty)
     local spawnMult = tonumber(opts.RaptorSpawnCountMult) or 1.0
     local queenMult = tonumber(opts.RaptorQueenHatchMult) or 1.0
     local graceMult = tonumber(opts.RaptorGracePeriodMult) or 1.0
+    local endless = (opts.RaptorEndless == 'enabled')
 
     Config = {
         GracePeriod = math.floor(baseConfig.GracePeriod * graceMult),
@@ -220,6 +563,7 @@ function StartRaptorDefense(armyIndex, difficulty)
         TurretInterval = baseConfig.TurretInterval,
         AngerBonus = baseConfig.AngerBonus,
         SpawnMult = baseConfig.SpawnMult * spawnMult,
+        Endless = endless,
     }
 
     local baseGain = 0.0
@@ -278,11 +622,29 @@ function OnRaptorKilled(unit, instigator)
     RaptorKills = RaptorKills + 1
 
     local bp = unit:GetBlueprint()
-    local cats = bp.CategoriesHash or {}
-    if cats['COMMAND'] or (bp.BlueprintId and string.lower(bp.BlueprintId) == 'xra0401') then
+    local bpId = bp.BlueprintId and string.lower(bp.BlueprintId)
+    -- Only trigger Queen Titan death for the true Queen Titan (XRA0401), NOT hives or sub-bosses!
+    if bpId == 'xra0401' then
         QueensKilled = QueensKilled + 1
         ActiveQueen = nil
-        Sync.RaptorAnnounce = { Text = "THE RAPTOR QUEEN TITAN HAS BEEN SLAIN!", Color = 'green' }
+        -- Show victory notice message once for the actual Queen dying
+        if QueensKilled == 1 then
+            Sync.RaptorAnnounce = { Text = "VICTORY: THE RAPTOR QUEEN TITAN HAS BEEN SLAIN!", Color = 'green' }
+        end
+        LOG("* RAPTOR FACTION: Final Matriarch Queen Titan (XRA0401) slain! Total Queens slain: " .. tostring(QueensKilled))
+
+        -- If Endless mode is disabled, killing the Queen achieves match victory
+        if not (Config and Config.Endless) and RaptorArmy and ArmyBrains[RaptorArmy] then
+            ForkThread(function()
+                WaitSeconds(3.0)
+                if ArmyBrains[RaptorArmy] and not ArmyBrains[RaptorArmy]:IsDefeated() then
+                    LOG("* RAPTOR FACTION: Matriarch Queen slain and Endless mode disabled - declaring Raptor Swarm defeat!")
+                    ArmyBrains[RaptorArmy]:OnDefeat()
+                end
+            end)
+        end
+    elseif bpId == 'xra0402' then
+        LOG("* RAPTOR FACTION: Phase 1 Sky Queen (XRA0402) shot down! Transitioning to Phase 2 Land Matriarch Titan...")
     end
 end
 
@@ -305,6 +667,11 @@ function MainPacingLoop()
 
         -- 1. Passive Aggression Decay
         PlayerAggression = PlayerAggression * 0.995
+
+        -- Tick parasitic Mex siphoning once globally per second
+        if Creep.TickMexInfestation then
+            Creep.TickMexInfestation(1.0)
+        end
 
         -- 2. Tech Anger Formula (0 - 999)
         if t >= Config.GracePeriod then
@@ -354,9 +721,13 @@ function MainPacingLoop()
         }
         if not QueenSpawned then
             if QueenAnger >= 100 or (burrowCount <= 0) or (t > Config.GracePeriod and burrowCount <= 1) then
-                QueenSpawned = true
-                QueenAnger = 100
-                SpawnQueenTitan(brain)
+                local queenUnit = SpawnQueenTitan(brain)
+                if queenUnit and not queenUnit.Dead then
+                    QueenSpawned = true
+                    QueenAnger = 100
+                else
+                    WARN("* RAPTOR FACTION: SpawnQueenTitan failed to return a live Queen! Will retry on next tick...")
+                end
             end
         end
 
@@ -413,7 +784,7 @@ function SpawnInitialHives(brain, count)
     if existingHives then
         for _, h in existingHives do
             if h and not h.Dead then
-                ActiveBurrows[h:GetEntityId()] = h
+                RegisterHive(h, brain)
                 Creep.StartCreepNode(h, 45.0, 0.9)
             end
         end
@@ -429,7 +800,7 @@ function SpawnInitialHives(brain, count)
         local hy = GetSurfaceHeight(hx, hz)
         local hive = brain:CreateUnitNearSpot('XRA0107', hx, hz)
         if hive then
-            ActiveBurrows[hive:GetEntityId()] = hive
+            RegisterHive(hive, brain)
             Creep.StartCreepNode(hive, 42.0, 0.8)
             -- Sprout 2 defensive Chitin Spore Tubes (XRA0121) along hive Creep
             for s = 1, 2 do
@@ -458,7 +829,7 @@ function SpawnBurrow(brain)
 
     local hive = brain:CreateUnitNearSpot('XRA0107', bx, bz)
     if hive then
-        ActiveBurrows[hive:GetEntityId()] = hive
+        RegisterHive(hive, brain)
         Creep.StartCreepNode(hive, 45.0, 0.9)
         -- Sprout a defensive Chitin Spore Tube (XRA0121)
         local tx = bx + math.random(-18, 18)
@@ -512,6 +883,7 @@ end
 ---@param siloUnit Unit
 ---@param brain AIBrain
 function StartBioNukeThread(siloUnit, brain)
+    siloUnit.BioNukeThreadRunning = true
     siloUnit:ForkThread(function()
         while siloUnit and not siloUnit.Dead do
             -- Wait until missile is loaded
@@ -520,13 +892,20 @@ function StartBioNukeThread(siloUnit, brain)
                 if not siloUnit or siloUnit.Dead then return end
             end
 
-            local targetPos = Targeting.GetWeightedEnemyTarget(siloUnit:GetArmy(), siloUnit:GetPosition())
-            if targetPos then
-                IssueNuke({siloUnit}, targetPos)
-                WaitSeconds(20)
-                IssueClearCommands({siloUnit})
+            -- Strategic ICBM bio-nuke flies through the air: pass isAir = true
+            local targetPos = Targeting.GetWeightedEnemyTarget(siloUnit:GetArmy(), siloUnit:GetPosition(), true)
+            if not targetPos or not Targeting.IsPositionValidAndOnMap(targetPos, 25) then
+                targetPos = Targeting.GetFallbackEnemyTarget(siloUnit:GetArmy(), true)
             end
-            WaitSeconds(30)
+
+            if targetPos and Targeting.IsPositionValidAndOnMap(targetPos, 25) then
+                IssueNuke({siloUnit}, targetPos)
+                WaitSeconds(12)
+                if siloUnit and not siloUnit.Dead then
+                    IssueClearCommands({siloUnit})
+                end
+            end
+            WaitSeconds(60)
         end
     end)
 end
@@ -665,76 +1044,121 @@ function SpawnWave(brain)
         if hive and not hive.Dead then
             local pos = hive:GetPosition()
             -- Distance-discounted and threat-aware target selection relative to this hive
-            local targetPos = Targeting.GetWeightedEnemyTarget(RaptorArmy, pos)
+            -- Separate land and air targets to prevent land platoons from chasing water/underwater targets
+            local landTargetPos = Targeting.GetWeightedEnemyTarget(RaptorArmy, pos, false)
+            local airTargetPos = Targeting.GetWeightedEnemyTarget(RaptorArmy, pos, true) or landTargetPos
+
+            -- Per-Hive Cliff / Hill / Mountain / Stacking check
+            local isCliff, airReason = IsHiveOnCliffOrHill(hive, brain, landTargetPos)
+            if isCliff then
+                hive.IsAirOnly = true
+                hive.AirOnlyReason = airReason
+                if not hive.AirEmitterCreated then
+                    hive.AirEmitterCreated = true
+                    CreateEmitterAtEntity(hive, hive:GetArmy(), '/mods/RaptorFaction/effects/emitters/raptor_bio_smoke_01_emit.bp'):ScaleEmitter(2.0)
+                end
+            end
+
             local spawnedUnits = {}
+            local hivePool = hive.IsAirOnly and GetAirUnitPool(TechAnger, threatProfile) or currentPool
 
             for i = 1, waveSize do
-                local unitBp = currentPool[math.random(1, table.getn(currentPool))]
+                local unitBp = hivePool[math.random(1, table.getn(hivePool))]
                 local u = brain:CreateUnitNearSpot(unitBp, pos[1] + math.random(-8, 8), pos[3] + math.random(-8, 8))
                 if u then
+                    u.RaptorSpawnTime = GetGameTimeSeconds()
                     -- Apply FAF Master Overhaul stat modification based on Anger
                     Stats.RecomputeRaptorStats(u, TechAnger, QueenAnger, CurrentDifficulty)
                     table.insert(spawnedUnits, u)
                 end
             end
 
-            -- Separate land and air units, and segregate high-speed air scouts (XRA0111)
+            -- Separate land and air units: segregate air scouts, air superiority fighters, and strike bombers/gunships
             local landUnits = {}
-            local combatAirUnits = {}
+            local strikeAirUnits = {}
+            local fighterUnits = {}
             local scoutUnits = {}
             for _, u in spawnedUnits do
                 if u and not u.Dead then
                     if EntityCategoryContains(categories.SCOUT * categories.AIR, u) then
                         table.insert(scoutUnits, u)
+                    elseif EntityCategoryContains(categories.AIR * categories.ANTIAIR - (categories.BOMBER + categories.GROUNDATTACK), u) then
+                        table.insert(fighterUnits, u)
                     elseif EntityCategoryContains(categories.AIR, u) then
-                        table.insert(combatAirUnits, u)
+                        table.insert(strikeAirUnits, u)
                     else
                         table.insert(landUnits, u)
                     end
                 end
             end
 
-            -- Guarantee formation escort protection:
-            -- Mobile Shield Beetles (XRA0225) protect land formations from incoming artillery/point defense
-            if TechAnger >= 20 and table.getn(landUnits) >= 3 then
-                local shieldBeetle = brain:CreateUnitNearSpot('XRA0225', pos[1] + math.random(-4, 4), pos[3] + math.random(-4, 4))
-                if shieldBeetle then
-                    Stats.RecomputeRaptorStats(shieldBeetle, TechAnger, QueenAnger, CurrentDifficulty)
-                    shieldBeetle:EnableShield()
-                    table.insert(landUnits, shieldBeetle)
+            if not hive.IsAirOnly then
+                -- Guarantee formation escort protection:
+                -- Mobile Shield Beetles (XRA0225) protect land formations from incoming artillery/point defense
+                if TechAnger >= 20 and table.getn(landUnits) >= 3 then
+                    local shieldBeetle = brain:CreateUnitNearSpot('XRA0225', pos[1] + math.random(-4, 4), pos[3] + math.random(-4, 4))
+                    if shieldBeetle then
+                        shieldBeetle.RaptorSpawnTime = GetGameTimeSeconds()
+                        Stats.RecomputeRaptorStats(shieldBeetle, TechAnger, QueenAnger, CurrentDifficulty)
+                        shieldBeetle:EnableShield()
+                        table.insert(landUnits, shieldBeetle)
+                    end
                 end
-            end
 
-            -- Heavy Assault Juggernauts (XRA0328 Tiamat) spearhead late-game land waves
-            if TechAnger >= 60 and table.getn(landUnits) >= 4 and math.random() > 0.4 then
-                local tiamat = brain:CreateUnitNearSpot('XRA0328', pos[1] + math.random(-5, 5), pos[3] + math.random(-5, 5))
-                if tiamat then
-                    Stats.RecomputeRaptorStats(tiamat, TechAnger, QueenAnger, CurrentDifficulty)
-                    tiamat:EnableShield()
-                    table.insert(landUnits, tiamat)
+                -- Heavy Assault Juggernauts (XRA0328 Tiamat) spearhead late-game land waves
+                if TechAnger >= 60 and table.getn(landUnits) >= 4 and math.random() > 0.4 then
+                    local tiamat = brain:CreateUnitNearSpot('XRA0328', pos[1] + math.random(-5, 5), pos[3] + math.random(-5, 5))
+                    if tiamat then
+                        tiamat.RaptorSpawnTime = GetGameTimeSeconds()
+                        Stats.RecomputeRaptorStats(tiamat, TechAnger, QueenAnger, CurrentDifficulty)
+                        tiamat:EnableShield()
+                        table.insert(landUnits, tiamat)
+                    end
                 end
-            end
 
-            -- Bio-Zeppelin Blimpy (XRA0227) drops living kamikaze dodo bombs in air assault waves
-            if TechAnger >= 25 and (table.getn(combatAirUnits) > 0 or math.random() > 0.5) then
-                local blimpy = brain:CreateUnitNearSpot('XRA0227', pos[1] + math.random(-6, 6), pos[3] + math.random(-6, 6))
-                if blimpy then
-                    Stats.RecomputeRaptorStats(blimpy, TechAnger, QueenAnger, CurrentDifficulty)
-                    table.insert(combatAirUnits, blimpy)
+                -- Bio-Zeppelin Blimpy (XRA0227) drops living kamikaze dodo bombs in air assault waves
+                if TechAnger >= 25 and (table.getn(strikeAirUnits) > 0 or math.random() > 0.5) then
+                    local blimpy = brain:CreateUnitNearSpot('XRA0227', pos[1] + math.random(-6, 6), pos[3] + math.random(-6, 6))
+                    if blimpy then
+                        blimpy.RaptorSpawnTime = GetGameTimeSeconds()
+                        Stats.RecomputeRaptorStats(blimpy, TechAnger, QueenAnger, CurrentDifficulty)
+                        table.insert(strikeAirUnits, blimpy)
+                    end
+                end
+            else
+                -- Specialized Aerial Escorts for cliff/mountain aerie hives
+                -- Bio-Zeppelin Blimpy (XRA0227) drops living kamikaze dodo bombs
+                if TechAnger >= 25 and (table.getn(strikeAirUnits) > 0 or math.random() > 0.3) then
+                    local blimpy = brain:CreateUnitNearSpot('XRA0227', pos[1] + math.random(-6, 6), pos[3] + math.random(-6, 6))
+                    if blimpy then
+                        blimpy.RaptorSpawnTime = GetGameTimeSeconds()
+                        Stats.RecomputeRaptorStats(blimpy, TechAnger, QueenAnger, CurrentDifficulty)
+                        table.insert(strikeAirUnits, blimpy)
+                    end
+                end
+
+                -- Heavy Air Superiority Raptor (XRA0314) escorts late-game air waves
+                if TechAnger >= 60 and math.random() > 0.3 then
+                    local airSup = brain:CreateUnitNearSpot('XRA0314', pos[1] + math.random(-6, 6), pos[3] + math.random(-6, 6))
+                    if airSup then
+                        airSup.RaptorSpawnTime = GetGameTimeSeconds()
+                        Stats.RecomputeRaptorStats(airSup, TechAnger, QueenAnger, CurrentDifficulty)
+                        table.insert(fighterUnits, airSup)
+                    end
                 end
             end
 
             -- High-Speed Recon Vanguard (XRA0111 Bio-Recon Scout):
             -- Flies ahead of bombers and strike waves to illuminate enemy targets & defenses
             local hasBombers = false
-            for _, u in combatAirUnits do
+            for _, u in strikeAirUnits do
                 if EntityCategoryContains(categories.BOMBER, u) then
                     hasBombers = true
                     break
                 end
             end
 
-            if (hasBombers or table.getn(combatAirUnits) >= 2 or (table.getn(landUnits) >= 4 and math.random() > 0.4)) and table.getn(scoutUnits) == 0 then
+            if (hasBombers or table.getn(strikeAirUnits) >= 2 or (table.getn(landUnits) >= 4 and math.random() > 0.4)) and table.getn(scoutUnits) == 0 then
                 local scoutCount = hasBombers and 2 or 1
                 for s = 1, scoutCount do
                     local scout = brain:CreateUnitNearSpot('XRA0111', pos[1] + math.random(-5, 5), pos[3] + math.random(-5, 5))
@@ -783,28 +1207,35 @@ function SpawnWave(brain)
             if table.getn(raiderUnits) > 0 then
                 local raiderPlatoon = brain:MakePlatoon('RaptorRaiderWolfpack', '')
                 brain:AssignUnitsToPlatoon(raiderPlatoon, raiderUnits, 'Attack', 'NoFormation')
-                PlatoonAI.ManageRaptorWolfpack(raiderPlatoon, targetPos, chosenMode)
+                PlatoonAI.ManageRaptorWolfpack(raiderPlatoon, landTargetPos, chosenMode)
             end
 
-            -- 2. Heavy Siege / Support Squad: Advances in coordinated combat line
+            -- 2. Heavy Siege / Support Squad: Advances in NoFormation for maximum unblocked throughput
             if table.getn(siegeUnits) > 0 then
                 local siegePlatoon = brain:MakePlatoon('RaptorSiegeWave', '')
-                brain:AssignUnitsToPlatoon(siegePlatoon, siegeUnits, 'Attack', 'AttackFormation')
-                PlatoonAI.ManageRaptorSquad(siegePlatoon, targetPos, chosenMode)
+                brain:AssignUnitsToPlatoon(siegePlatoon, siegeUnits, 'Attack', 'NoFormation')
+                PlatoonAI.ManageRaptorSquad(siegePlatoon, landTargetPos, chosenMode)
             end
 
             -- Form Air Recon Platoon in NoFormation so scouts fly ahead at full top speed (28.0)
             if table.getn(scoutUnits) > 0 then
                 local scoutPlatoon = brain:MakePlatoon('RaptorAirScout', '')
                 brain:AssignUnitsToPlatoon(scoutPlatoon, scoutUnits, 'Scout', 'NoFormation')
-                PlatoonAI.ManageRaptorScoutSquad(scoutPlatoon, targetPos)
+                PlatoonAI.ManageRaptorScoutSquad(scoutPlatoon, airTargetPos)
             end
 
-            -- Form Air Combat Platoon in NoFormation with dedicated aerial combat AI
-            if table.getn(combatAirUnits) > 0 then
+            -- Form Air Superiority Fighter Wing: Dedicated air-to-air hunting & hive air defense sweeps
+            if table.getn(fighterUnits) > 0 then
+                local fighterPlatoon = brain:MakePlatoon('RaptorAirFighterWing', '')
+                brain:AssignUnitsToPlatoon(fighterPlatoon, fighterUnits, 'Attack', 'NoFormation')
+                PlatoonAI.ManageRaptorFighterWing(fighterPlatoon)
+            end
+
+            -- Form Air Strike Platoon (Bombers & Gunships) in NoFormation with dedicated aerial assault AI
+            if table.getn(strikeAirUnits) > 0 then
                 local airPlatoon = brain:MakePlatoon('RaptorAirWave', '')
-                brain:AssignUnitsToPlatoon(airPlatoon, combatAirUnits, 'Attack', 'NoFormation')
-                PlatoonAI.ManageRaptorAirSquad(airPlatoon, targetPos)
+                brain:AssignUnitsToPlatoon(airPlatoon, strikeAirUnits, 'Attack', 'NoFormation')
+                PlatoonAI.ManageRaptorAirSquad(airPlatoon, airTargetPos)
             end
         end
     end
@@ -814,7 +1245,7 @@ end
 ---Spawns cloaked Diggers (XRA0116) that bypass shields/walls to strike rear economy
 ---@param brain AIBrain
 function TriggerDiggerAmbush(brain)
-    local targetPos = Targeting.GetWeightedEnemyTarget(RaptorArmy)
+    local targetPos = Targeting.GetWeightedEnemyTarget(RaptorArmy, nil, false)
     if not targetPos then return end
 
     -- Offset breach location 18-24 units behind/adjacent to the target
@@ -823,8 +1254,6 @@ function TriggerDiggerAmbush(brain)
     local bx = targetPos[1] + math.cos(angle) * dist
     local bz = targetPos[3] + math.sin(angle) * dist
     local by = GetSurfaceHeight(bx, bz)
-
-    Sync.RaptorAnnounce = { Text = "WARNING: Subterranean breach detected! Burrowing Diggers emerging!", Color = 'yellow' }
 
     local diggerCount = math.min(8, math.floor(3 + (TechAnger * 0.06)))
     local spawnedDiggers = {}
@@ -898,9 +1327,9 @@ function SpawnDragonHerald(brain)
         end
 
         local heraldPlatoon = brain:MakePlatoon('RaptorHeraldStrike', '')
-        brain:AssignUnitsToPlatoon(heraldPlatoon, escortUnits, 'Attack', 'AttackFormation')
+        brain:AssignUnitsToPlatoon(heraldPlatoon, escortUnits, 'Attack', 'NoFormation')
 
-        local target = Targeting.GetWeightedEnemyTarget(RaptorArmy, bestPos)
+        local target = Targeting.GetWeightedEnemyTarget(RaptorArmy, bestPos, false)
         PlatoonAI.ManageRaptorSquad(heraldPlatoon, target, 'center')
     end
 end
@@ -920,19 +1349,47 @@ function SpawnQueenTitan(brain)
         bestPos = GetBrainStartVector(brain)
     end
 
-    Sync.RaptorAnnounce = {
-        Text = "CRITICAL WARNING: THE APEX SKY MATRIARCH QUEEN HAS TAKEN FLIGHT!",
-        Color = 'red'
-    }
+    LOG("* RAPTOR FACTION: Attempting to spawn Apex Sky Matriarch Queen Titan (XRA0402) at (" .. tostring(bestPos[1]) .. ", " .. tostring(bestPos[3]) .. ")")
 
-    local skyQueen = brain:CreateUnitNearSpot('XRA0402', bestPos[1], bestPos[3])
-    if skyQueen then
+    local skyQueen = nil
+    local ok, err = pcall(function()
+        skyQueen = brain:CreateUnitNearSpot('XRA0402', bestPos[1], bestPos[3])
+    end)
+    if not ok or not skyQueen or skyQueen.Dead then
+        WARN("* RAPTOR FACTION: CreateUnitNearSpot failed for XRA0402: " .. tostring(err) .. ". Attempting CreateUnit fallback...")
+        local by = GetSurfaceHeight(bestPos[1], bestPos[3]) + 22.0
+        local ok2, err2 = pcall(function()
+            skyQueen = CreateUnit('xra0402', RaptorArmy, bestPos[1], by, bestPos[3], 0, 0, 0)
+        end)
+        if not ok2 or not skyQueen or skyQueen.Dead then
+            WARN("* RAPTOR FACTION: CreateUnit fallback for XRA0402 failed: " .. tostring(err2) .. ". Attempting Phase 2 Land Matriarch (XRA0401) directly...")
+            local ok3, err3 = pcall(function()
+                skyQueen = brain:CreateUnitNearSpot('XRA0401', bestPos[1], bestPos[3])
+            end)
+            if not ok3 or not skyQueen or skyQueen.Dead then
+                WARN("* RAPTOR FACTION: CRITICAL: Could not spawn either XRA0402 or XRA0401! Error: " .. tostring(err3))
+                return nil
+            end
+        end
+    end
+
+    if skyQueen and not skyQueen.Dead then
         ActiveQueen = skyQueen
         Stats.RecomputeRaptorStats(skyQueen, TechAnger, QueenAnger, CurrentDifficulty)
 
+        Sync.RaptorAnnounce = {
+            Text = "CRITICAL WARNING: THE APEX SKY MATRIARCH QUEEN HAS TAKEN FLIGHT!",
+            Color = 'red'
+        }
+        LOG("* RAPTOR FACTION: Successfully spawned Queen Titan: " .. tostring(skyQueen:GetBlueprint().BlueprintId))
+
         -- Order Sky Queen directly into combat targeting highest-value vulnerable threat
-        local target = Targeting.GetWeightedEnemyTarget(RaptorArmy, bestPos)
-        IssueAggressiveMove({skyQueen}, target)
+        local target = Targeting.GetWeightedEnemyTarget(RaptorArmy, bestPos, true)
+        if target then
+            IssueAggressiveMove({skyQueen}, target)
+        end
+        return skyQueen
     end
+    return nil
 end
 

@@ -629,9 +629,6 @@ bp_xra0103 = """UnitBlueprint {
         'PRODUCTSC1',
         'SELECTABLE',
         'BUILTBYRAPTORHIVE',
-        'BUILTBYTIER1FACTORY',
-        'BUILTBYTIER2FACTORY',
-        'CYBRAN',
         'RAPTOR',
         'MOBILE',
         'LAND',
@@ -785,44 +782,131 @@ with open(os.path.join(dir_xra0103, "XRA0103_unit.bp"), "w") as f:
 
 script_xra0103 = """local CWalkingLandUnit = import('/lua/cybranunits.lua').CWalkingLandUnit
 local Weapon = import('/lua/sim/weapon.lua').Weapon
+local DamageArea = DamageArea
+local CreateEmitterAtEntity = CreateEmitterAtEntity
+local ForkThread = ForkThread
+local WaitTicks = WaitTicks
+local IsDestroyed = IsDestroyed
 
-local BloodDeathEffects = {
+local AcidKamikazeEffects = {
+    '/mods/RaptorFaction/effects/emitters/raptor_acid_splash_01_emit.bp',
+    '/mods/RaptorFaction/effects/emitters/raptor_acid_puddle_01_emit.bp',
+    '/mods/RaptorFaction/effects/emitters/raptor_acid_bubbles_01_emit.bp',
+    '/mods/RaptorFaction/effects/emitters/raptor_acid_steam_01_emit.bp',
     '/mods/RaptorFaction/effects/emitters/raptor_blood_spray_01_emit.bp',
     '/mods/RaptorFaction/effects/emitters/raptor_flesh_chunks_01_emit.bp',
-    '/mods/RaptorFaction/effects/emitters/raptor_blood_cloud_01_emit.bp',
 }
 
----@class KamikazeWeapon : Weapon
-local KamikazeWeapon = ClassWeapon(Weapon) {
+---@class XRA0103_SuicideWeapon : Weapon
+local XRA0103_SuicideWeapon = ClassWeapon(Weapon) {
     OnFire = function(self)
-        local myUnit = self.unit
-        local army = myUnit.Army
-        for _, emit in BloodDeathEffects do
-            CreateEmitterAtEntity(myUnit, army, emit):ScaleEmitter(2.5)
+        local unit = self.unit
+        if not unit.Dead and not unit.Detonated then
+            unit:Kill()
         end
-        myUnit:Kill()
+    end,
+}
+
+---@class XRA0103_DeathAcidWeapon : Weapon
+local XRA0103_DeathAcidWeapon = ClassWeapon(Weapon) {
+    OnCreate = function(self)
+        Weapon.OnCreate(self)
+        self:SetWeaponEnabled(false)
+        self:ChangeMaxRadius(self:GetDamageTable().DamageRadius)
+    end,
+
+    Fire = function(self)
+        local unit = self.unit
+        if not unit or unit.Detonated then return end
+        unit.Detonated = true
+
+        local position = unit:GetPosition()
+        local damageTable = self:GetDamageTable()
+        local radius = damageTable.DamageRadius or 3.5
+        local damage = damageTable.DamageAmount or 750
+        local dType = damageTable.DamageType or 'Normal'
+        local dFriendly = damageTable.DamageFriendly or false
+
+        DamageArea(unit, position, radius, damage, dType, dFriendly)
+
+        local army = unit.Army
+        for _, emit in AcidKamikazeEffects do
+            CreateEmitterAtEntity(unit, army, emit):ScaleEmitter(2.0)
+        end
+
+        unit:PlayUnitSound('Destroyed')
+        unit:Destroy()
     end,
 }
 
 ---@class XRA0103 : CWalkingLandUnit
 XRA0103 = ClassUnit(CWalkingLandUnit) {
     Weapons = {
-        Suicide = ClassWeapon(KamikazeWeapon) {},
+        Suicide = ClassWeapon(XRA0103_SuicideWeapon) {},
+        DeathWeapon = ClassWeapon(XRA0103_DeathAcidWeapon) {},
     },
 
+    OnCreate = function(self)
+        CWalkingLandUnit.OnCreate(self)
+        self:StartTrackTargetThread()
+    end,
+
+    StartTrackTargetThread = function(self)
+        local navigator = self:GetNavigator()
+        if not navigator then return end
+        local weapon = self:GetWeaponByLabel('Suicide')
+        if not weapon then return end
+
+        return self.Trash:Add(
+            ForkThread(self.TrackTargetThread, self, navigator, weapon)
+        )
+    end,
+
+    TrackTargetThread = function(self, navigator, weapon)
+        local lastTarget
+        while not IsDestroyed(self) and not IsDestroyed(weapon) do
+            local command = self:GetCommandQueue()[1]
+            local target
+            if command and command.commandType == 10 then
+                target = command.target
+            end
+            if not target then
+                lastTarget = nil
+                navigator:SetSpeedThroughGoal(false)
+            elseif target ~= lastTarget then
+                lastTarget = target
+                navigator:SetSpeedThroughGoal(true)
+            end
+
+            WaitTicks(5)
+        end
+    end,
+
+    OnProductionPaused = function(self)
+        local weapon = self:GetWeaponByLabel('Suicide')
+        if weapon then
+            weapon:FireWeapon()
+        elseif not self.Dead then
+            self:Kill()
+        end
+    end,
+
+    DoDeathWeapon = function(self)
+        if self:IsBeingBuilt() then return end
+        CWalkingLandUnit.DoDeathWeapon(self)
+    end,
+
     OnKilled = function(self, instigator, type, overkillRatio)
-        local army = self.Army
-        for _, emit in BloodDeathEffects do
-            CreateEmitterAtEntity(self, army, emit):ScaleEmitter(2.5)
+        if not self.Detonated then
+            local deathWeapon = self:GetWeaponByLabel('DeathWeapon')
+            if deathWeapon then
+                deathWeapon:Fire()
+            end
         end
         CWalkingLandUnit.OnKilled(self, instigator, type, overkillRatio)
     end,
 
     CreateDestructionEffects = function(self, overKillRatio)
-        local army = self.Army
-        for _, emit in BloodDeathEffects do
-            CreateEmitterAtEntity(self, army, emit):ScaleEmitter(2.5)
-        end
     end,
 }
 
@@ -918,7 +1002,7 @@ save_sca_file(os.path.join(dir_xra0104, "XRA0104_Adeath01.sca"), num_frames, dur
 
 bp_xra0104 = """UnitBlueprint {
     Air = {
-        AutoLandTime = 0,
+        AutoLandTime = -1,
         BankFactor = 3,
         BankForward = false,
         BreakOffDistance = 34,
@@ -969,9 +1053,6 @@ bp_xra0104 = """UnitBlueprint {
         'PRODUCTSC1',
         'SELECTABLE',
         'BUILTBYRAPTORHIVE',
-        'BUILTBYTIER1FACTORY',
-        'BUILTBYTIER2FACTORY',
-        'CYBRAN',
         'RAPTOR',
         'MOBILE',
         'AIR',
@@ -1070,7 +1151,8 @@ bp_xra0104 = """UnitBlueprint {
             BombDropThreshold = 3,
             Damage = 240,
             DamageFriendly = false,
-            DamageRadius = 2.5,
+            DamageRadius = 3.0,
+            DamageToShields = 500,
             DamageType = 'Normal',
             DisplayName = 'Bio-Acid Cluster Bomb',
             FireTargetLayerCapsTable = {
@@ -1326,9 +1408,6 @@ bp_xra0109 = """UnitBlueprint {
         'PRODUCTSC1',
         'SELECTABLE',
         'BUILTBYRAPTORHIVE',
-        'BUILTBYTIER1FACTORY',
-        'BUILTBYTIER2FACTORY',
-        'CYBRAN',
         'RAPTOR',
         'MOBILE',
         'LAND',
@@ -1455,6 +1534,7 @@ with open(os.path.join(dir_xra0109, "XRA0109_unit.bp"), "w") as f:
     f.write(bp_xra0109)
 
 script_xra0109 = """local ConstructionUnit = import('/lua/defaultunits.lua').ConstructionUnit
+local WalkingLandUnit = import('/lua/defaultunits.lua').WalkingLandUnit
 
 local BloodDeathEffects = {
     '/mods/RaptorFaction/effects/emitters/raptor_blood_spray_01_emit.bp',
@@ -1462,8 +1542,10 @@ local BloodDeathEffects = {
     '/mods/RaptorFaction/effects/emitters/raptor_blood_cloud_01_emit.bp',
 }
 
----@class XRA0109 : ConstructionUnit
-XRA0109 = ClassUnit(ConstructionUnit) {
+---@class XRA0109 : ConstructionUnit, WalkingLandUnit
+XRA0109 = ClassUnit(ConstructionUnit, WalkingLandUnit) {
+    OnMotionHorzEventChange = WalkingLandUnit.OnMotionHorzEventChange,
+
     OnCreate = function(self)
         ConstructionUnit.OnCreate(self)
         self:ForkThread(self.HealerAuraThread)
@@ -1573,15 +1655,7 @@ save_sca_file(os.path.join(dir_xra0202, "XRA0202_Awalk.sca"), num_frames, dur, n
 num_frames = 16
 dur = 0.8
 frames = []
-thor_recoil = {
-    'thor1': 16.0,
-    'thor2': 10.0,
-    'thor3': 6.0,
-    'thor4': -3.0,
-    'thor5': -6.0,
-    'thor6': -4.0,
-    'thor7': -5.0,
-}
+thor_recoil = {} # Thorax bones left unrotated so turret manipulator has 100% targeting stability
 for f_idx in range(num_frames):
     t = f_idx / num_frames
     time_sec = t * dur
@@ -1657,10 +1731,6 @@ bp_xra0202 = """UnitBlueprint {
         'PRODUCTSC1',
         'SELECTABLE',
         'BUILTBYRAPTORHIVE',
-        'BUILTBYTIER1FACTORY',
-        'BUILTBYTIER2FACTORY',
-        'BUILTBYTIER3FACTORY',
-        'CYBRAN',
         'RAPTOR',
         'MOBILE',
         'LAND',
@@ -1776,7 +1846,8 @@ bp_xra0202 = """UnitBlueprint {
             CollideFriendly = false,
             Damage = 85,
             DamageFriendly = false,
-            DamageRadius = 2.5,
+            DamageRadius = 3.0,
+            DamageToShields = 500,
             DamageType = 'Normal',
             DisplayName = 'Bio-Acid Mortar',
             FireTargetLayerCapsTable = {
@@ -1784,14 +1855,16 @@ bp_xra0202 = """UnitBlueprint {
                 Water = 'Land|Water|Seabed',
             },
             FiringRandomness = 0.8,
-            FiringTolerance = 3,
+            FiringTolerance = 1,
             Label = 'MainGun',
-            MaxRadius = 64,
-            MinRadius = 8,
+            MaxRadius = 90,
+            MinRadius = 15,
             MuzzleSalvoDelay = 0.18,
             MuzzleSalvoSize = 4,
-            MuzzleVelocity = 22,
-            MuzzleVelocityReduceDistance = 64,
+            MuzzleVelocity = 26,
+            MuzzleVelocityReduceDistance = 90,
+            ProjectileLifetime = 20,
+            LeadTarget = false,
             ProjectileId = '/mods/RaptorFaction/projectiles/XRA_BioMortar01/XRA_BioMortar01_proj.bp',
             ProjectilesPerOnFire = 1,
             RackBones = {
@@ -1854,7 +1927,7 @@ local BioMortarWeapon = ClassWeapon(DefaultProjectileWeapon) {
     PlayFxMuzzleSequence = function(self, muzzle)
         DefaultProjectileWeapon.PlayFxMuzzleSequence(self, muzzle)
         local unit = self.unit
-        if not unit.Dead then
+        if self.CurrentSalvoNumber == 1 and not unit.Dead then
             if not unit.FireAnim then
                 unit.FireAnim = CreateAnimator(unit)
                 unit.Trash:Add(unit.FireAnim)
@@ -1973,7 +2046,7 @@ save_sca_file(os.path.join(dir_xra0205, "XRA0205_Adeath01.sca"), num_frames, dur
 
 bp_xra0205 = """UnitBlueprint {
     Air = {
-        AutoLandTime = 0,
+        AutoLandTime = -1,
         BankFactor = 0.1,
         BankForward = false,
         CanFly = true,
@@ -2015,9 +2088,6 @@ bp_xra0205 = """UnitBlueprint {
         'PRODUCTSC1',
         'SELECTABLE',
         'BUILTBYRAPTORHIVE',
-        'BUILTBYTIER1FACTORY',
-        'BUILTBYTIER2FACTORY',
-        'CYBRAN',
         'RAPTOR',
         'MOBILE',
         'AIR',
@@ -2407,10 +2477,6 @@ bp_xra0301 = """UnitBlueprint {
         'PRODUCTSC1',
         'SELECTABLE',
         'BUILTBYRAPTORHIVE',
-        'BUILTBYTIER1FACTORY',
-        'BUILTBYTIER2FACTORY',
-        'BUILTBYTIER3FACTORY',
-        'CYBRAN',
         'RAPTOR',
         'MOBILE',
         'LAND',
@@ -2861,10 +2927,6 @@ bp_xra0401 = """UnitBlueprint {
     Categories = {
         'PRODUCTSC1',
         'SELECTABLE',
-        'BUILTBYTIER1ENGINEER',
-        'BUILTBYTIER2ENGINEER',
-        'BUILTBYTIER3ENGINEER',
-        'CYBRAN',
         'RAPTOR',
         'MOBILE',
         'LAND',
@@ -2934,7 +2996,7 @@ bp_xra0401 = """UnitBlueprint {
             RULEUCC_Stop = true,
             RULEUCC_Transport = false,
         },
-        FactionName = 'Cybran',
+        FactionName = 'Raptor',
         Icon = 'amph',
         UnitName = '<LOC xra0401_name>Matriarch Raptor Queen',
     },
@@ -3058,7 +3120,8 @@ bp_xra0401 = """UnitBlueprint {
             CollideFriendly = false,
             Damage = 1200,
             DamageFriendly = false,
-            DamageRadius = 2.5,
+            DamageRadius = 3.0,
+            DamageToShields = 500,
             DamageType = 'Normal',
             DisplayName = 'Crushing Scythe Cleave',
             FireTargetLayerCapsTable = {
@@ -3261,6 +3324,41 @@ if os.path.exists(bp_roost_path):
     with open(bp_roost_path, "w") as f:
         f.write(c)
     print("Updated XRA0107 Gestation Roost build queue.")
+
+# ===========================================================================
+# 9.5 AUTOMATED FACTION ISOLATION (REMOVE FOREIGN/STANDARD CATEGORIES)
+# ===========================================================================
+print("\n--- Applying Automated Faction Isolation Across All Unit Blueprints ---")
+import re
+for u in os.listdir(units_root):
+    bp_path = os.path.join(units_root, u, f"{u}_unit.bp")
+    if not os.path.isfile(bp_path):
+        continue
+    with open(bp_path, 'r', encoding='utf-8', errors='ignore') as f:
+        content = f.read()
+    orig = content
+    cat_match = re.search(r'(Categories\s*=\s*\{)([^}]+)(\})', content)
+    if cat_match:
+        cat_header, cat_body, cat_footer = cat_match.group(1), cat_match.group(2), cat_match.group(3)
+        lines = cat_body.splitlines()
+        new_lines = []
+        for line in lines:
+            stripped = line.strip().strip("',")
+            if stripped in ('CYBRAN', 'UEF', 'AEON', 'SERAPHIM'):
+                continue
+            if stripped in ('BUILTBYTIER1FACTORY', 'BUILTBYTIER2FACTORY', 'BUILTBYTIER3FACTORY'):
+                continue
+            if stripped in ('BUILTBYTIER1ENGINEER', 'BUILTBYTIER2ENGINEER', 'BUILTBYTIER3ENGINEER', 'BUILTBYCOMMANDER'):
+                continue
+            new_lines.append(line)
+        cleaned_body = re.sub(r'\n\s*\n', '\n', '\n'.join(new_lines))
+        content = content[:cat_match.start()] + cat_header + cleaned_body + cat_footer + content[cat_match.end():]
+    content = re.sub(r"FactionName\s*=\s*'Cybran'", "FactionName = 'Raptor'", content)
+    content = re.sub(r'FactionName\s*=\s*"Cybran"', "FactionName = 'Raptor'", content)
+    if content != orig:
+        with open(bp_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+        print(f"Isolated: {u}_unit.bp")
 
 # ===========================================================================
 # 10. UPDATE MOD INFO & EXPORT ARCHIVE

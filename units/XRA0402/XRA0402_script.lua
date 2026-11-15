@@ -16,12 +16,12 @@ local AcidGooWeapon = ClassWeapon(DefaultProjectileWeapon) {
 
 ---@class DorsalSporeWeapon : DefaultProjectileWeapon
 local DorsalSporeWeapon = ClassWeapon(DefaultProjectileWeapon) {
-    FxMuzzleFlash = EffectTemplate.DefaultMuzzleFlash01,
+    FxMuzzleFlash = EffectTemplate.CElectronBolterMuzzleFlash01,
 }
 
 ---@class BroodBombWeapon : DefaultProjectileWeapon
 local BroodBombWeapon = ClassWeapon(DefaultProjectileWeapon) {
-    FxMuzzleFlash = EffectTemplate.DefaultMuzzleFlash02,
+    FxMuzzleFlash = EffectTemplate.CLaserMuzzleFlash01,
 }
 
 ---@class XRA0402 : CAirUnit
@@ -30,6 +30,7 @@ XRA0402 = ClassUnit(CAirUnit) {
         AcidGooCannon = ClassWeapon(AcidGooWeapon) {},
         DorsalSporeFlak = ClassWeapon(DorsalSporeWeapon) {},
         BroodBombDrop = ClassWeapon(BroodBombWeapon) {},
+        DeathWeapon = ClassWeapon(DefaultProjectileWeapon) {},
     },
 
     CreateWreckage = function(self, overkillRatio)

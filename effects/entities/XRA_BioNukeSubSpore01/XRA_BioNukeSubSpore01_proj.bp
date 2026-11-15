@@ -1,0 +1,46 @@
+ProjectileBlueprint {
+    Audio = {
+        Impact = Sound {
+            Bank = 'Impacts',
+            Cue = 'X_Impact_Land_Gen_Seraphim',
+            LodCutoff = 'Weapon_LodCutoff',
+        },
+    },
+    Categories = {
+        'RAPTOR',
+        'PROJECTILE',
+    },
+    Display = {
+        CameraFollowTimeout = 2,
+        CameraFollowsProjectile = false,
+        Mesh = {
+            LODs = {
+                {
+                    AlbedoName = '/mods/RaptorFaction/projectiles/XRA_Spore01/XRA_Spore01_Albedo.dds',
+                    LODCutoff = 200,
+                    MeshName = '/mods/RaptorFaction/projectiles/XRA_Spore01/XRA_Spore01_lod0.scm',
+                    NormalsName = '/mods/RaptorFaction/units/XRA0101/XRA0101_NormalsTS.dds',
+                    SpecularName = '/mods/RaptorFaction/units/XRA0101/XRA0101_SpecTeam.dds',
+                    ShaderName = 'Insect',
+                },
+            },
+        },
+        StrategicIconSize = 1,
+        UniformScale = 1.0,
+    },
+    General = {
+        Category = 'Direct Fire',
+        Faction = 'Raptor',
+    },
+    Physics = {
+        CollideEntity = true,
+        CollideSurface = true,
+        DestroyOnWater = true,
+        InitialSpeed = 25,
+        Lifetime = 10,
+        RotationalVelocity = 360,
+        RotationalVelocityRange = 180,
+        UseGravity = true,
+        VelocityAlign = true,
+    },
+}

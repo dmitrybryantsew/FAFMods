@@ -1,6 +1,7 @@
 PropBlueprint {
     Categories = {
         'RECLAIMABLE',
+        'OBSTRUCTSBUILDING',
     },
     Defense = {
         Health = 1000,
@@ -21,9 +22,9 @@ PropBlueprint {
         UniformScale = 0.12,
     },
     Economy = {
-        ReclaimEnergyMax = 100,
-        ReclaimMassMax = 50,
-        ReclaimTime = 2,
+        ReclaimEnergyMax = 500,
+        ReclaimMassMax = 500,
+        ReclaimTimeMultiplier = 1,
     },
     Interface = {
         HelpText = 'Biological Raptor Egg',
@@ -31,6 +32,8 @@ PropBlueprint {
     Physics = {
         BlockPath = false,
     },
+    ScriptClass = 'Prop',
+    ScriptModule = '/lua/sim/prop.lua',
     SizeX = 0.5,
     SizeY = 0.5,
     SizeZ = 0.5,

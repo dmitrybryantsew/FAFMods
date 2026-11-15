@@ -9,6 +9,7 @@
 -- ****************************************************************************
 
 local Targeting = import('/mods/RaptorFaction/lua/RaptorTargeting.lua')
+local okNav, NavUtils = pcall(import, '/lua/sim/NavUtils.lua')
 
 ---Safely checks if a unit is idle without throwing on non-existent methods
 ---@param u Unit
@@ -29,10 +30,11 @@ end
 -- 1. PLATOON SQUAD CENTROID & REGROUPING ENGINE
 -- ---------------------------------------------------------------------------
 
----Checks if any unit in the platoon is actively firing, targeting an enemy, or recently took damage
+---Checks if any unit in the platoon is actively firing, targeting a valid reachable enemy, or recently took damage
 ---@param platoon Platoon
+---@param isAir boolean|nil If true, caller is an aerial squad and can engage water/seabed targets
 ---@return boolean
-function IsPlatoonInCombat(platoon)
+function IsPlatoonInCombat(platoon, isAir)
     local units = platoon:GetPlatoonUnits()
     if not units or table.empty(units) then return false end
     local currentTime = GetGameTimeSeconds()
@@ -41,7 +43,17 @@ function IsPlatoonInCombat(platoon)
             -- Check if unit has active target or recent damage timestamp (< 6s)
             local hasTarget = false
             if u.GetTargetEntity and u:GetTargetEntity() then
-                hasTarget = true
+                local tgt = u:GetTargetEntity()
+                if tgt and not tgt.Dead and (not tgt.BeenDestroyed or not tgt:BeenDestroyed()) then
+                    -- If target is underwater on seabed or submerged, raptors cannot attack it
+                    if Targeting.IsTargetUnderwater(tgt) then
+                        hasTarget = false
+                    elseif not isAir and Targeting.IsTargetAirOnly(tgt) then
+                        hasTarget = false
+                    else
+                        hasTarget = true
+                    end
+                end
             end
             if hasTarget or (u.LastDamagedTime and (currentTime - u.LastDamagedTime) < 6.0) then
                 return true
@@ -96,16 +108,96 @@ function GenerateFlankingRoute(startPos, targetPos, flankMode)
     return route
 end
 
+---Generates a high-speed approach corridor across the FAF NavMesh.
+---Decomposes long-distance moves into coarse waypoints (35-70 units apart)
+---so the C++ engine pathfinder solves local line-of-sight hops in <0.01ms with zero queue freeze.
+---@param startPos Vector3
+---@param targetPos Vector3
+---@param layer string|nil 'Land' | 'Amphibious' | 'Air'
+---@param flankMode string|nil 'center' | 'left' | 'right'
+---@return table route Array of Vector waypoints
+function GetNavCorridor(startPos, targetPos, layer, flankMode)
+    local route = {}
+    if not startPos or not targetPos then return route end
+
+    layer = layer or 'Land'
+
+    -- Air units fly straight across terrain; standard flanking route works best
+    if layer == 'Air' then
+        return GenerateFlankingRoute(startPos, targetPos, flankMode)
+    end
+
+    if okNav and NavUtils then
+        if not NavUtils.IsGenerated() then
+            pcall(NavUtils.Generate)
+        end
+
+        if NavUtils.IsGenerated() and NavUtils.CanPathTo(layer, startPos, targetPos) then
+            local positions, posCount = NavUtils.PathTo(layer, startPos, targetPos)
+            if positions and posCount and posCount > 0 then
+                local lastPos = startPos
+                for i = 1, posCount do
+                    local pt = positions[i]
+                    if pt then
+                        local px = pt[1]
+                        local pz = pt[3]
+                        local dx = px - lastPos[1]
+                        local dz = pz - lastPos[3]
+                        local dist = math.sqrt(dx * dx + dz * dz)
+
+                        -- Keep waypoints spaced at least 35 units apart (or final waypoint)
+                        if dist >= 35.0 or i == posCount then
+                            -- Add slight organic lateral jitter (±4m) to intermediate points
+                            -- so swarms form a broad front instead of a single-file conga line
+                            if i < posCount then
+                                px = px + (math.random() * 8.0 - 4.0)
+                                pz = pz + (math.random() * 8.0 - 4.0)
+                            end
+                            local py = GetSurfaceHeight(px, pz)
+                            table.insert(route, Vector(px, py, pz))
+                            lastPos = { px, py, pz }
+                        end
+                    end
+                end
+
+                if table.getn(route) > 0 then
+                    -- Append the final destination if far from the last waypoint
+                    local lastWp = route[table.getn(route)]
+                    local fdx = targetPos[1] - lastWp[1]
+                    local fdz = targetPos[3] - lastWp[3]
+                    if (fdx * fdx + fdz * fdz) > (16.0 * 16.0) then
+                        table.insert(route, targetPos)
+                    end
+                    return route
+                end
+            end
+        end
+    end
+
+    -- Fallback to flanking route if NavMesh unavailable or off-mesh
+    return GenerateFlankingRoute(startPos, targetPos, flankMode)
+end
+
 ---Priority Decapitation Sniping: Hunts down game-ending Experimentals, Strategic Artillery, and Paragons
 ---@param platoon Platoon
+---@param isAir boolean|nil
 ---@return boolean wasPriorityFound
-function PlatoonHuntPriorityThreat(platoon)
+function PlatoonHuntPriorityThreat(platoon, isAir)
     if not platoon or not platoon.FindClosestUnit then return false end
     local targetCategory = categories.EXPERIMENTAL + (categories.STRATEGIC * categories.ARTILLERY)
+    if not isAir then
+        targetCategory = targetCategory - categories.NAVAL - categories.SUBMERSIBLE
+    end
     local ok, target = pcall(function()
         return platoon:FindClosestUnit('Attack', 'Enemy', true, targetCategory)
     end)
     if ok and target and not target.Dead and (not target.BeenDestroyed or not target:BeenDestroyed()) then
+        if Targeting.IsTargetUnderwater(target) then
+            return false
+        end
+        if not isAir and Targeting.IsTargetAirOnly(target) then
+            return false
+        end
         local tPos = target:GetPosition()
         platoon:Stop()
         platoon:AggressiveMoveToLocation(tPos)
@@ -239,6 +331,8 @@ function GetStandoffDistance(brain, targetPos)
     return standoffDist
 end
 
+local ActiveWolfpacks = {}
+
 ---WOLFPACK SQUAD AI (Raiders & Fast Swarmers):
 ---Runs in 'NoFormation' to unlock 100% native physics speed.
 ---Sprints to target, checks danger, stalks/circles at weapon-range + respectable buffer,
@@ -249,6 +343,9 @@ end
 function ManageRaptorWolfpack(platoon, targetPos, flankMode)
     if platoon and platoon.SetFormation then
         platoon:SetFormation('NoFormation')
+    end
+    if platoon then
+        ActiveWolfpacks[platoon] = true
     end
     platoon:ForkThread(WolfpackProwlThread, targetPos, flankMode)
 end
@@ -271,9 +368,9 @@ function WolfpackProwlThread(platoon, targetPos, flankMode)
         local units = platoon:GetPlatoonUnits()
         if not units or table.empty(units) then break end
 
-        -- Retarget if targetPos is nil or destroyed
+        -- Retarget if targetPos is nil or destroyed (land-only target)
         if not targetPos then
-            targetPos = Targeting.GetWeightedEnemyTarget(army)
+            targetPos = Targeting.GetWeightedEnemyTarget(army, nil, false)
             state = 'SPRINT'
             initialSprintDone = false
             prowlTimer = 0
@@ -302,11 +399,42 @@ function WolfpackProwlThread(platoon, targetPos, flankMode)
             local packZ = pz / count
             local distToTarget = math.sqrt((packX - targetPos[1])^2 + (packZ - targetPos[3])^2)
 
+            -- Centroid Stuck Detection: If pack centroid moved < 4.5 units in 12s while far from target,
+            -- pack is blocked by cliff edge, canyon, or water! Force retarget to another land expansion!
+            if not platoon.LastCentroidPos then
+                platoon.LastCentroidPos = { packX, packZ }
+                platoon.StuckTime = 0
+            else
+                local cdx = packX - platoon.LastCentroidPos[1]
+                local cdz = packZ - platoon.LastCentroidPos[2]
+                local movedDist = math.sqrt(cdx * cdx + cdz * cdz)
+                if movedDist < 4.5 and distToTarget > 20.0 then
+                    platoon.StuckTime = (platoon.StuckTime or 0) + 3.0
+                    if platoon.StuckTime >= 12.0 then
+                        local currentPos = Vector(packX, GetSurfaceHeight(packX, packZ), packZ)
+                        targetPos = Targeting.GetWeightedEnemyTarget(army, currentPos, false)
+                        IssueClearCommands(units)
+                        state = 'SPRINT'
+                        initialSprintDone = false
+                        prowlTimer = 0
+                        overwhelmTimer = 0
+                        justRetargeted = true
+                        platoon.StuckTime = 0
+                        platoon.LastCentroidPos = { packX, packZ }
+                    end
+                else
+                    platoon.LastCentroidPos = { packX, packZ }
+                    platoon.StuckTime = 0
+                end
+            end
+
             -- If in active combat (taking damage or shooting), fight to the death!
             -- BUT skip this override if we just retargeted — let SPRINT initialize first
-            if IsPlatoonInCombat(platoon) and not justRetargeted then
-                state = 'OVERWHELM'
-                overwhelmTimer = 0
+            if IsPlatoonInCombat(platoon, false) and not justRetargeted then
+                if state ~= 'OVERWHELM' then
+                    state = 'OVERWHELM'
+                    overwhelmTimer = 0
+                end
             end
 
             -- Clear the retarget guard once we've had a chance to process the new state
@@ -318,7 +446,8 @@ function WolfpackProwlThread(platoon, targetPos, flankMode)
             if state == 'SPRINT' then
                 if not initialSprintDone then
                     local startPos = Vector(packX, GetSurfaceHeight(packX, packZ), packZ)
-                    local route = GenerateFlankingRoute(startPos, targetPos, flankMode)
+                    local route = GetNavCorridor(startPos, targetPos, 'Land', flankMode)
+                    platoon.CurrentCorridorRoute = route
                     IssueClearCommands(units)
                     for _, wp in route do
                         IssueAggressiveMove(units, wp)
@@ -334,7 +463,13 @@ function WolfpackProwlThread(platoon, targetPos, flankMode)
                         state = 'OVERWHELM'
                         overwhelmTimer = 0
                         IssueClearCommands(units)
-                        IssueAggressiveMove(units, targetPos)
+                        for _, u in units do
+                            if u and not u.Dead and (not u.BeenDestroyed or not u:BeenDestroyed()) then
+                                local jx = targetPos[1] + math.random(-12, 12)
+                                local jz = targetPos[3] + math.random(-12, 12)
+                                IssueAggressiveMove({u}, Vector(jx, GetSurfaceHeight(jx, jz), jz))
+                            end
+                        end
                     else
                         -- Fortified target -> Transition to Prowl & Stalk!
                         state = 'PROWL'
@@ -342,18 +477,16 @@ function WolfpackProwlThread(platoon, targetPos, flankMode)
                         IssueClearCommands(units)
                     end
                 else
-                    -- If units stalled or became idle en route, re-issue sprint orders
-                    local allIdle = true
+                    -- For any trailing stragglers or newly joined units that have an empty command queue:
+                    -- Guide them to the pack centroid / lead position rather than far-away target!
+                    local leadPos = Vector(packX, GetSurfaceHeight(packX, packZ), packZ)
                     for _, u in units do
                         if u and not u.Dead and (not u.BeenDestroyed or not u:BeenDestroyed()) then
-                            if not IsUnitIdle(u) then
-                                allIdle = false
-                                break
+                            local q = u.GetCommandQueue and u:GetCommandQueue()
+                            if not q or table.empty(q) then
+                                IssueAggressiveMove({u}, leadPos)
                             end
                         end
-                    end
-                    if allIdle then
-                        initialSprintDone = false
                     end
                 end
 
@@ -368,16 +501,22 @@ function WolfpackProwlThread(platoon, targetPos, flankMode)
 
                 -- Check if critical mass is reached or artillery has arrived
                 if targetDanger <= 0 or swarmPower >= (targetDanger * 1.20) then
-                    -- Critical mass reached! UNLEASH THE OVERWHELM CHARGE!
+                    -- Critical mass reached! UNLEASH THE OVERWHELM CHARGE WITH SCATTER!
                     state = 'OVERWHELM'
                     overwhelmTimer = 0
                     IssueClearCommands(units)
-                    IssueAggressiveMove(units, targetPos)
+                    for _, u in units do
+                        if u and not u.Dead and (not u.BeenDestroyed or not u:BeenDestroyed()) then
+                            local jx = targetPos[1] + math.random(-12, 12)
+                            local jz = targetPos[3] + math.random(-12, 12)
+                            IssueAggressiveMove({u}, Vector(jx, GetSurfaceHeight(jx, jz), jz))
+                        end
+                    end
                 elseif prowlTimer >= 22.0 then
                     -- Timeout: Target is too dangerous and reinforcements failed to arrive
-                    -- Smart predator fallback: Don't suicide! Hunt an unfortified target!
+                    -- Smart predator fallback: Don't suicide! Hunt an unfortified land target!
                     local currentPos = Vector(packX, GetSurfaceHeight(packX, packZ), packZ)
-                    targetPos = Targeting.GetWeightedEnemyTarget(army, currentPos)
+                    targetPos = Targeting.GetWeightedEnemyTarget(army, currentPos, false)
                     state = 'SPRINT'
                     initialSprintDone = false
                     prowlTimer = 0
@@ -419,9 +558,10 @@ function WolfpackProwlThread(platoon, targetPos, flankMode)
                 local allOrdersDone = true
                 for _, u in units do
                     if u and not u.Dead and (not u.BeenDestroyed or not u:BeenDestroyed()) then
-                        if not IsUnitIdle(u) then
+                        if IsUnitIdle(u) then
+                            IssueAggressiveMove({u}, targetPos)
+                        else
                             allOrdersDone = false
-                            break
                         end
                     end
                 end
@@ -436,15 +576,15 @@ function WolfpackProwlThread(platoon, targetPos, flankMode)
                 local remainingEnemies = brain:GetUnitsAroundPoint(categories.ALLUNITS - categories.WALL, targetPos, 40.0, 'Enemy')
                 local areaCleared = (not remainingEnemies or table.empty(remainingEnemies))
 
-                -- Staleness safety: if stuck in OVERWHELM for 30s+ and all units are idle,
-                -- the target is effectively dead even if stray units linger at the edge of scan
-                if not areaCleared and overwhelmTimer >= 30.0 and allOrdersDone and distToTarget <= 25.0 then
+                -- Staleness safety: if stuck in OVERWHELM for 25s+ and cannot finish target,
+                -- break off and retarget to another enemy sector!
+                if not areaCleared and overwhelmTimer >= 25.0 then
                     areaCleared = true
                 end
 
                 if areaCleared then
                     local currentPos = Vector(packX, GetSurfaceHeight(packX, packZ), packZ)
-                    targetPos = Targeting.GetWeightedEnemyTarget(army, currentPos)
+                    targetPos = Targeting.GetWeightedEnemyTarget(army, currentPos, false)
                     state = 'SPRINT'
                     initialSprintDone = false
                     prowlTimer = 0
@@ -455,6 +595,82 @@ function WolfpackProwlThread(platoon, targetPos, flankMode)
         end
 
         WaitSeconds(3.0 + math.random() * 0.8)
+    end
+
+    if platoon and ActiveWolfpacks then
+        ActiveWolfpacks[platoon] = nil
+    end
+end
+
+---Registers living raptors spawned dynamically in the field (from artillery shells,
+---bomber eggs, dodo carriers, queen gestation, etc.), scales their stats to match current game anger,
+---and merges them into a nearby active pack platoon or creates a new wolfpack.
+---@param units table Array of Unit objects
+---@param brain AIBrain
+---@param spawnPos Vector3|table {x, y, z}
+function RegisterFieldSpawnedUnits(units, brain, spawnPos)
+    if not units or table.empty(units) or not brain then return end
+
+    local army = brain:GetArmyIndex()
+    local Spawner = import('/mods/RaptorFaction/lua/RaptorSpawner.lua')
+    local Stats = import('/mods/RaptorFaction/lua/RaptorStats.lua')
+    local techAnger = (Spawner and Spawner.GetTechAnger and Spawner.GetTechAnger()) or 0
+    local queenAnger = (Spawner and Spawner.GetQueenAnger and Spawner.GetQueenAnger()) or 0
+    local difficulty = (Spawner and Spawner.GetCurrentDifficulty and Spawner.GetCurrentDifficulty()) or 'normal'
+
+    local validUnits = {}
+    for _, u in units do
+        if u and not u.Dead and (not u.BeenDestroyed or not u:BeenDestroyed()) then
+            u.RaptorSpawnTime = GetGameTimeSeconds()
+            if Stats and Stats.RecomputeRaptorStats then
+                Stats.RecomputeRaptorStats(u, techAnger, queenAnger, difficulty)
+            end
+            u:SetHealth(u, u:GetMaxHealth())
+            table.insert(validUnits, u)
+        end
+    end
+
+    if table.empty(validUnits) then return end
+
+    -- Check if there is an active RaptorRaiderWolfpack nearby (within 60 units) to merge into
+    local bestPlatoon = nil
+    local bestDistSq = 60 * 60
+
+    if ActiveWolfpacks then
+        for plat, _ in ActiveWolfpacks do
+            if plat and brain:PlatoonExists(plat) then
+                local platUnits = plat:GetPlatoonUnits()
+                if platUnits and table.getn(platUnits) > 0 then
+                    local pPos = plat:GetPlatoonPosition()
+                    if pPos and spawnPos then
+                        local dx = pPos[1] - spawnPos[1]
+                        local dz = pPos[3] - spawnPos[3]
+                        local dSq = dx * dx + dz * dz
+                        if dSq < bestDistSq then
+                            bestDistSq = dSq
+                            bestPlatoon = plat
+                        end
+                    end
+                end
+            else
+                ActiveWolfpacks[plat] = nil
+            end
+        end
+    end
+
+    if bestPlatoon then
+        brain:AssignUnitsToPlatoon(bestPlatoon, validUnits, 'Attack', 'NoFormation')
+        local pPos = bestPlatoon:GetPlatoonPosition()
+        if pPos then
+            IssueClearCommands(validUnits)
+            IssueAggressiveMove(validUnits, pPos)
+        end
+    else
+        -- Create a dedicated Wolfpack platoon for these spawned raiders
+        local targetPos = Targeting.GetWeightedEnemyTarget(army, spawnPos, false)
+        local newPlatoon = brain:MakePlatoon('RaptorRaiderWolfpack', '')
+        brain:AssignUnitsToPlatoon(newPlatoon, validUnits, 'Attack', 'NoFormation')
+        ManageRaptorWolfpack(newPlatoon, targetPos, 'center')
     end
 end
 
@@ -468,7 +684,7 @@ end
 ---@param flankMode string|nil 'center' | 'left' | 'right'
 function ManageRaptorSquad(platoon, targetPos, flankMode)
     if platoon and platoon.SetFormation then
-        platoon:SetFormation('AttackFormation')
+        platoon:SetFormation('NoFormation')
     end
     platoon:ForkThread(PlatoonCohesionThread, targetPos, flankMode)
 end
@@ -476,7 +692,7 @@ end
 function PlatoonCohesionThread(platoon, targetPos, flankMode)
     local planArmy = nil
     if platoon and platoon.SetFormation then
-        platoon:SetFormation('AttackFormation')
+        platoon:SetFormation('NoFormation')
     end
 
     while platoon do
@@ -504,87 +720,120 @@ function PlatoonCohesionThread(platoon, targetPos, flankMode)
             end
         end
 
-        -- Check for priority superweapon decapitation targets
-        if PlatoonHuntPriorityThreat(platoon) then
+        -- Check for priority superweapon decapitation targets (land only)
+        if PlatoonHuntPriorityThreat(platoon, false) then
             platoon.HasAssaultOrder = true
             platoon.IsRegrouping = false
         end
 
         -- Retarget if targetPos is nil
         if not targetPos and planArmy then
-            targetPos = Targeting.GetWeightedEnemyTarget(planArmy)
+            targetPos = Targeting.GetWeightedEnemyTarget(planArmy, nil, false)
             platoon.HasAssaultOrder = false
         end
 
         if targetPos then
             platoon.CurrentAssaultPos = targetPos
 
-            -- Combat Safety Lock:
-            -- If any unit is fighting or recently damaged, skip cohesion regrouping entirely.
-            if IsPlatoonInCombat(platoon) then
-                platoon.IsRegrouping = false
-            else
-                local xmin, xmax = 999999, -999999
-                local zmin, zmax = 999999, -999999
-                local xsum, zsum = 0, 0
-                local count = 0
+            local xmin, xmax = 999999, -999999
+            local zmin, zmax = 999999, -999999
+            local xsum, zsum = 0, 0
+            local count = 0
 
+            for _, u in units do
+                if u and not u.Dead and not u:BeenDestroyed() then
+                    -- Cohesion Exemption: Exclude units currently executing individual tactical micro
+                    if not u.IsFleeing and not u.IsKiting and not u.IsBerserk then
+                        local p = u:GetPosition()
+                        if p[1] < xmin then xmin = p[1] end
+                        if p[1] > xmax then xmax = p[1] end
+                        if p[3] < zmin then zmin = p[3] end
+                        if p[3] > zmax then zmax = p[3] end
+                        xsum = xsum + p[1]
+                        zsum = zsum + p[3]
+                        count = count + 1
+                    end
+                end
+            end
+
+            if count == 0 then
+                -- If all active units are currently performing micro, calculate across all active units
                 for _, u in units do
                     if u and not u.Dead and not u:BeenDestroyed() then
-                        -- Cohesion Exemption: Exclude units currently executing individual tactical micro
-                        if not u.IsFleeing and not u.IsKiting and not u.IsBerserk then
-                            local p = u:GetPosition()
-                            if p[1] < xmin then xmin = p[1] end
-                            if p[1] > xmax then xmax = p[1] end
-                            if p[3] < zmin then zmin = p[3] end
-                            if p[3] > zmax then zmax = p[3] end
-                            xsum = xsum + p[1]
-                            zsum = zsum + p[3]
-                            count = count + 1
-                        end
+                        local p = u:GetPosition()
+                        xsum = xsum + p[1]
+                        zsum = zsum + p[3]
+                        count = count + 1
                     end
                 end
+            end
 
-                if count == 0 then
-                    -- If all active units are currently performing micro, calculate across all active units
-                    for _, u in units do
-                        if u and not u.Dead and not u:BeenDestroyed() then
-                            local p = u:GetPosition()
-                            xsum = xsum + p[1]
-                            zsum = zsum + p[3]
-                            count = count + 1
-                        end
+            if count == 0 then break end
+
+            local xavg = xsum / count
+            local zavg = zsum / count
+            local distToTargetSq = (xavg - targetPos[1]) * (xavg - targetPos[1]) + (zavg - targetPos[3]) * (zavg - targetPos[3])
+
+            -- Centroid Stuck Detection: If siege platoon moved < 4.0 in 12s while far from target,
+            -- it is blocked by cliff edge or impassable terrain! Force retarget to reachable land base!
+            if not platoon.LastCentroidPos then
+                platoon.LastCentroidPos = { xavg, zavg }
+                platoon.StuckTime = 0
+            else
+                local cdx = xavg - platoon.LastCentroidPos[1]
+                local cdz = zavg - platoon.LastCentroidPos[2]
+                local movedDist = math.sqrt(cdx * cdx + cdz * cdz)
+                if movedDist < 4.0 and distToTargetSq > (25 * 25) then
+                    platoon.StuckTime = (platoon.StuckTime or 0) + 4.0
+                    if platoon.StuckTime >= 12.0 then
+                        local currentPos = Vector(xavg, GetSurfaceHeight(xavg, zavg), zavg)
+                        targetPos = Targeting.GetWeightedEnemyTarget(planArmy, currentPos, false)
+                        platoon.HasAssaultOrder = false
+                        platoon.CurrentAssaultPos = targetPos
+                        platoon.AssaultDuration = 0
+                        platoon.StuckTime = 0
+                        platoon.LastCentroidPos = { xavg, zavg }
+                        IssueClearCommands(units)
                     end
-                end
-
-                if count == 0 then break end
-
-                local xavg = xsum / count
-                local zavg = zsum / count
-
-                -- Check if platoon reached target area, retarget to nearest high-value vulnerable eco
-                local distToTargetSq = (xavg - targetPos[1]) * (xavg - targetPos[1]) + (zavg - targetPos[3]) * (zavg - targetPos[3])
-                if distToTargetSq < 25 * 25 and planArmy then
-                    local currentPos = Vector(xavg, GetSurfaceHeight(xavg, zavg), zavg)
-                    targetPos = Targeting.GetWeightedEnemyTarget(planArmy, currentPos)
-                    platoon.HasAssaultOrder = false
-                    platoon.CurrentAssaultPos = targetPos
-                    flankMode = 'center'
                 else
-                    -- Check if units completed orders or became idle en route
-                    local allIdle = true
-                    for _, u in units do
-                        if u and not u.Dead and not u:BeenDestroyed() then
-                            if not IsUnitIdle(u) then
-                                allIdle = false
-                                break
+                    platoon.LastCentroidPos = { xavg, zavg }
+                    platoon.StuckTime = 0
+                end
+            end
+
+            -- Check if platoon reached target area or exceeded maximum assault duration (35s)
+            platoon.AssaultDuration = (platoon.AssaultDuration or 0) + 4.0
+            if (distToTargetSq < 25 * 25 or platoon.AssaultDuration >= 35.0) and planArmy then
+                local currentPos = Vector(xavg, GetSurfaceHeight(xavg, zavg), zavg)
+                targetPos = Targeting.GetWeightedEnemyTarget(planArmy, currentPos, false)
+                platoon.HasAssaultOrder = false
+                platoon.CurrentAssaultPos = targetPos
+                platoon.AssaultDuration = 0
+                flankMode = 'center'
+            else
+                -- Check if any units lost their orders or detached en route
+                local cPos = Vector(xavg, GetSurfaceHeight(xavg, zavg), zavg)
+                local curTime = GetGameTimeSeconds()
+                for _, u in units do
+                    if u and not u.Dead and not u:BeenDestroyed() then
+                        local busy = u.IsFleeing or u.IsKiting or u.IsBerserk
+                            or (u.GetTargetEntity and u:GetTargetEntity())
+                            or (u.LastDamagedTime and (curTime - u.LastDamagedTime) < 5.0)
+                        if not busy then
+                            local q = u.GetCommandQueue and u:GetCommandQueue()
+                            if not q or table.empty(q) then
+                                IssueAggressiveMove({u}, cPos)
                             end
                         end
                     end
-                    if allIdle then
-                        platoon.HasAssaultOrder = false
-                    end
                 end
+            end
+
+            -- Combat Safety Lock:
+            -- If any unit is fighting or recently damaged, skip cohesion regrouping entirely.
+            if IsPlatoonInCombat(platoon, false) then
+                platoon.IsRegrouping = false
+            else
 
                 -- Max spread threshold: 75 units allows natural combat movement without false-positive regrouping
                 local maxSpread = 75.0
@@ -648,24 +897,26 @@ function PlatoonCohesionThread(platoon, targetPos, flankMode)
                     end
                 end
 
-                -- Issue multi-pronged approach corridor attack orders
+                -- Issue multi-pronged approach corridor attack orders using NavMesh corridor
                 if not platoon.HasAssaultOrder then
                     local startPos = Vector(xavg, GetSurfaceHeight(xavg, zavg), zavg)
-                    local route = GenerateFlankingRoute(startPos, targetPos, flankMode)
-                    platoon:Stop()
+                    local route = GetNavCorridor(startPos, targetPos, 'Land', flankMode)
                     local routeLen = table.getn(route)
-                    for i, wp in route do
-                        local wx = wp[1]
-                        local wz = wp[3]
-                        if i == routeLen then
-                            wx = wx + math.random(-15, 15)
-                            wz = wz + math.random(-15, 15)
+                    if routeLen > 0 then
+                        platoon:Stop()
+                        for i, wp in route do
+                            local wx = wp[1]
+                            local wz = wp[3]
+                            if i == routeLen then
+                                wx = wx + math.random(-15, 15)
+                                wz = wz + math.random(-15, 15)
+                            end
+                            local wy = GetSurfaceHeight(wx, wz)
+                            platoon:AggressiveMoveToLocation(Vector(wx, wy, wz))
                         end
-                        local wy = GetSurfaceHeight(wx, wz)
-                        platoon:AggressiveMoveToLocation(Vector(wx, wy, wz))
+                        platoon.HasAssaultOrder = true
+                        platoon.IsRegrouping = false
                     end
-                    platoon.HasAssaultOrder = true
-                    platoon.IsRegrouping = false
                 end
             end
         end
@@ -711,6 +962,16 @@ function AirAssaultThread(platoon, targetPos)
             end
         end
 
+        -- Verify targetPos is not underwater or on seabed
+        if targetPos then
+            local surfY = GetSurfaceHeight(targetPos[1], targetPos[3])
+            local terrY = GetTerrainHeight(targetPos[1], targetPos[3])
+            if (surfY > terrY + 1.2) and (targetPos[2] < surfY - 0.5) then
+                targetPos = nil
+                currentAssignedPos = nil
+            end
+        end
+
         -- Check if squad has bombers/gunships or is pure anti-air fighter wing
         local hasGroundAttack = false
         for _, u in units do
@@ -723,15 +984,29 @@ function AirAssaultThread(platoon, targetPos)
         end
 
         if not hasGroundAttack then
-            -- Pure fighter wing: prioritize hunting active enemy air squadrons!
+            -- Pure fighter wing: hunt enemy air units across the map!
             local enemyAir = platoon:FindClosestUnit('Attack', 'Enemy', true, categories.AIR * categories.MOBILE)
             if enemyAir and not enemyAir.Dead and (not enemyAir.BeenDestroyed or not enemyAir:BeenDestroyed()) then
                 targetPos = enemyAir:GetPosition()
+            else
+                -- If no enemy air active, patrol friendly base/hives instead of diving on ground targets!
+                targetPos = nil
+                local brain = platoon:GetBrain()
+                if brain then
+                    local pPos = platoon:GetPlatoonPosition() or Vector(512, 50, 512)
+                    local hives = brain:GetUnitsAroundPoint(categories.RAPTOR * categories.STRUCTURE, pPos, 350.0, 'Ally')
+                    if hives and not table.empty(hives) then
+                        local h = hives[math.random(1, table.getn(hives))]
+                        if h and not h.Dead then
+                            targetPos = h:GetPosition()
+                        end
+                    end
+                end
             end
         end
 
         if not targetPos and planArmy then
-            targetPos = Targeting.GetWeightedEnemyTarget(planArmy)
+            targetPos = Targeting.GetWeightedEnemyTarget(planArmy, nil, true)
         end
 
         local allIdle = true
@@ -746,6 +1021,7 @@ function AirAssaultThread(platoon, targetPos)
 
         if targetPos and (allIdle or not currentAssignedPos or currentAssignedPos[1] ~= targetPos[1] or currentAssignedPos[3] ~= targetPos[3]) then
             currentAssignedPos = targetPos
+            platoon.AirTargetTimer = 0
 
             -- Generate a wide aerial attack/patrol diamond around targetPos
             local offset = 40.0
@@ -769,16 +1045,96 @@ function AirAssaultThread(platoon, targetPos)
 
         -- Re-evaluate target every 15-25 seconds with jitter
         WaitSeconds(15.0 + math.random() * 10.0)
-        if planArmy and not IsPlatoonInCombat(platoon) then
+        platoon.AirTargetTimer = (platoon.AirTargetTimer or 0) + 20.0
+        if planArmy then
             local brain = platoon:GetBrain()
             if brain and targetPos then
+                -- Exclude underwater/seabed units (which air units cannot damage) from clearance check
                 local enemies = brain:GetUnitsAroundPoint(categories.ALLUNITS - categories.WALL, targetPos, 35.0, 'Enemy')
-                if not enemies or table.empty(enemies) then
+                local validEnemies = {}
+                if enemies then
+                    for _, e in enemies do
+                        if e and not e.Dead and (not e.BeenDestroyed or not e:BeenDestroyed()) then
+                            if not Targeting.IsTargetUnderwater(e) then
+                                table.insert(validEnemies, e)
+                            end
+                        end
+                    end
+                end
+                local areaCleared = table.empty(validEnemies)
+
+                -- Force retarget if area cleared or if air squad has lingered over target for 35s+
+                if areaCleared or platoon.AirTargetTimer >= 35.0 then
                     local airPos = platoon:GetPlatoonPosition()
-                    targetPos = Targeting.GetWeightedEnemyTarget(planArmy, airPos)
+                    targetPos = Targeting.GetWeightedEnemyTarget(planArmy, airPos, true)
+                    platoon.AirTargetTimer = 0
+                    currentAssignedPos = nil
                 end
             end
         end
+    end
+end
+
+---Dedicated Air Superiority AI for Raptor Fighter Wings (XRA0115, XRA0314, XRA0219):
+---Aggressively hunts enemy aircraft across the map.
+---If no enemy aircraft are detected, sweeps friendly airspace / hive perimeters at high altitude.
+---NEVER patrols or hovers around seabed or ground structures!
+---@param platoon Platoon
+function ManageRaptorFighterWing(platoon)
+    if platoon and platoon.SetFormation then
+        platoon:SetFormation('NoFormation')
+    end
+    platoon:ForkThread(FighterWingThread)
+end
+
+function FighterWingThread(platoon)
+    local brain = platoon:GetBrain()
+    local army = brain:GetArmyIndex()
+    if platoon and platoon.SetFormation then
+        platoon:SetFormation('NoFormation')
+    end
+
+    while platoon and brain:PlatoonExists(platoon) do
+        local units = platoon:GetPlatoonUnits()
+        if not units or table.empty(units) then break end
+
+        -- 1. Scan for closest enemy aircraft across the map
+        local enemyAir = platoon:FindClosestUnit('Attack', 'Enemy', true, categories.AIR * categories.MOBILE)
+        if enemyAir and not enemyAir.Dead and (not enemyAir.BeenDestroyed or not enemyAir:BeenDestroyed()) then
+            IssueClearCommands(units)
+            IssueAttack(units, enemyAir)
+        else
+            -- 2. No enemy aircraft active/visible: patrol high-altitude airspace around allied hives
+            local myPos = platoon:GetPlatoonPosition() or Vector(512, 50, 512)
+            local hives = brain:GetUnitsAroundPoint(categories.RAPTOR * categories.STRUCTURE, myPos, 350.0, 'Ally')
+            local patrolCenter = myPos
+
+            if hives and not table.empty(hives) then
+                local chosenHive = hives[math.random(1, table.getn(hives))]
+                if chosenHive and not chosenHive.Dead then
+                    patrolCenter = chosenHive:GetPosition()
+                end
+            end
+
+            local offset = 65.0
+            local y1 = GetSurfaceHeight(patrolCenter[1] + offset, patrolCenter[3]) + 25
+            local y2 = GetSurfaceHeight(patrolCenter[1], patrolCenter[3] + offset) + 25
+            local y3 = GetSurfaceHeight(patrolCenter[1] - offset, patrolCenter[3]) + 25
+            local y4 = GetSurfaceHeight(patrolCenter[1], patrolCenter[3] - offset) + 25
+
+            local p1 = Vector(patrolCenter[1] + offset, y1, patrolCenter[3])
+            local p2 = Vector(patrolCenter[1], y2, patrolCenter[3] + offset)
+            local p3 = Vector(patrolCenter[1] - offset, y3, patrolCenter[3])
+            local p4 = Vector(patrolCenter[1], y4, patrolCenter[3] - offset)
+
+            IssueClearCommands(units)
+            IssuePatrol(units, p1)
+            IssuePatrol(units, p2)
+            IssuePatrol(units, p3)
+            IssuePatrol(units, p4)
+        end
+
+        WaitSeconds(10.0 + math.random() * 5.0)
     end
 end
 
@@ -816,7 +1172,7 @@ function AirScoutThread(platoon, targetPos)
         end
 
         if not targetPos and planArmy then
-            targetPos = Targeting.GetWeightedEnemyTarget(planArmy)
+            targetPos = Targeting.GetWeightedEnemyTarget(planArmy, nil, true)
         end
 
         local allIdle = true
@@ -858,7 +1214,7 @@ function AirScoutThread(platoon, targetPos)
         WaitSeconds(20.0 + math.random() * 10.0)
         if planArmy then
             local scoutPos = platoon:GetPlatoonPosition()
-            targetPos = Targeting.GetWeightedEnemyTarget(planArmy, scoutPos)
+            targetPos = Targeting.GetWeightedEnemyTarget(planArmy, scoutPos, true)
         end
     end
 end
@@ -933,8 +1289,13 @@ function TriggerCowardFlee(unit, instigator)
             local plat = unit:GetPlatoon()
             if plat and plat.CurrentAssaultPos then
                 IssueAggressiveMove({unit}, plat.CurrentAssaultPos)
-            elseif instigator and not instigator.Dead then
-                IssueAggressiveMove({unit}, instigator:GetPosition())
+                if not Targeting.IsTargetUnderwater(instigator) then
+                    local bp = unit:GetBlueprint()
+                    local isAir = bp and bp.Physics and bp.Physics.MotionType == 'RULEUMT_Air'
+                    if isAir or not Targeting.IsTargetAirOnly(instigator) then
+                        IssueAggressiveMove({unit}, instigator:GetPosition())
+                    end
+                end
             end
         end
     end)
@@ -946,6 +1307,17 @@ end
 function TriggerBerserkCharge(unit, instigator)
     if not unit or unit.Dead or not instigator or instigator.Dead then return end
     if unit.IsBerserk then return end
+
+    -- Check if instigator is unreachable (e.g. underwater or deep water)
+    if Targeting.IsTargetUnderwater(instigator) then
+        return
+    end
+
+    local bp = unit:GetBlueprint()
+    local isAir = bp and bp.Physics and bp.Physics.MotionType == 'RULEUMT_Air'
+    if not isAir and Targeting.IsTargetAirOnly(instigator) then
+        return -- Do not pursue unreachable water targets into cliffs or rivers
+    end
 
     unit.IsBerserk = true
     -- Boost speed by +35% for 4.5 seconds
@@ -1069,12 +1441,12 @@ function ManageDiggerAmbushSquad(platoon, targetPos)
             -- If target is missing, destroyed, or squad is idle, locate next rear eco/radar/artillery target
             if not targetPos or allIdle then
                 local bestTarget = platoon:FindClosestUnit('Attack', 'Enemy', true,
-                    categories.STRUCTURE * (categories.MASSEXTRACTION + categories.ENERGYPRODUCTION + categories.RADAR + categories.INDIRECTFIRE)
+                    (categories.STRUCTURE * (categories.MASSEXTRACTION + categories.ENERGYPRODUCTION + categories.RADAR + categories.INDIRECTFIRE)) - categories.NAVAL - categories.SUBMERSIBLE
                 )
-                if bestTarget and not bestTarget.Dead then
+                if bestTarget and not bestTarget.Dead and not Targeting.IsTargetAirOnly(bestTarget) then
                     targetPos = bestTarget:GetPosition()
                 else
-                    targetPos = Targeting.GetWeightedEnemyTarget(army)
+                    targetPos = Targeting.GetWeightedEnemyTarget(army, nil, false)
                 end
             end
 
@@ -1086,8 +1458,12 @@ function ManageDiggerAmbushSquad(platoon, targetPos)
 
                 if allIdle or not currentAssignedPos or currentAssignedPos[1] ~= tPos[1] or currentAssignedPos[3] ~= tPos[3] then
                     currentAssignedPos = tPos
+                    local pPos = platoon:GetPlatoonPosition() or tPos
+                    local route = GetNavCorridor(pPos, tPos, 'Land', 'center')
                     platoon:Stop()
-                    platoon:AggressiveMoveToLocation(tPos)
+                    for _, wp in route do
+                        platoon:AggressiveMoveToLocation(wp)
+                    end
                 end
             end
 

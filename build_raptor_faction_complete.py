@@ -577,6 +577,7 @@ with open(os.path.join(dir_xra0109, "XRA0109_unit.bp"), "w") as f:
     f.write(bp_weaver)
 
 script_weaver = """local ConstructionUnit = import('/lua/defaultunits.lua').ConstructionUnit
+local WalkingLandUnit = import('/lua/defaultunits.lua').WalkingLandUnit
 
 local BloodDeathEffects = {
     '/mods/RaptorFaction/effects/emitters/raptor_blood_spray_01_emit.bp',
@@ -584,7 +585,10 @@ local BloodDeathEffects = {
     '/mods/RaptorFaction/effects/emitters/raptor_blood_cloud_01_emit.bp',
 }
 
-XRA0109 = Class(ConstructionUnit) {
+---@class XRA0109 : ConstructionUnit, WalkingLandUnit
+XRA0109 = ClassUnit(ConstructionUnit, WalkingLandUnit) {
+    OnMotionHorzEventChange = WalkingLandUnit.OnMotionHorzEventChange,
+
     OnKilled = function(self, instigator, type, overkillRatio)
         local army = self.Army
         for _, emit in BloodDeathEffects do
@@ -760,6 +764,108 @@ XRA_BioNuke01 = ClassProjectile(NukeProjectile) {
         NukeProjectile.OnCreate(self)
         self.effectEntityPath = '/mods/RaptorFaction/effects/entities/XRA_BioNukeEffect01/XRA_BioNukeEffect01_proj.bp'
         self:LauncherCallbacks()
+    end,
+
+    ---Robust strategic nuclear missile movement thread:
+    ---1. Climbs vertically to stratosphere altitude (7.8s)
+    ---2. Pitches horizontally to target heading (2.1s @ 45 deg/s)
+    ---3. Cruises flat at high altitude (TurnRate = 0)
+    ---4. Dives steeply (TurnRate = 65+) straight down into target upon arrival (dist <= 32)
+    ---5. Hard boundary and ground watchdog: detonates immediately if reaching map border or terrain
+    MovementThread = function(self)
+        self.Nuke = true
+        self:CreateEffects(self.InitialEffects, self.Army, 1)
+
+        -- Initial vertical ascent to gain altitude clear of terrain
+        self:TrackTarget(false)
+        WaitTicks(26)
+        self:SetCollision(true)
+        self:CreateEffects(self.LaunchEffects, self.Army, 1)
+        WaitTicks(26)
+        self:CreateEffects(self.ThrustEffects, self.Army, 3)
+        WaitTicks(26)
+
+        -- Turn towards target heading and level out to horizontal cruise
+        self:TrackTarget(true)
+        self:SetDestroyOnWater(true)
+        self:SetTurnRate(45)
+        WaitTicks(21)
+
+        -- Freeze turn rate for flat high-altitude cruise towards target
+        self:SetTurnRate(0)
+        self:SetAcceleration(0.001)
+        self.WaitTime = 6
+
+        local lastDist = 999999
+        local turningDown = false
+
+        while not self:BeenDestroyed() do
+            local dist = self:GetDistanceToTarget()
+            local mpos = self:GetPosition()
+
+            -- 1. HARD BOUNDARY WATCHDOG: Detonate immediately if approaching map edges
+            local mapW = (ScenarioInfo and ScenarioInfo.size and ScenarioInfo.size[1]) or 1024
+            local mapH = (ScenarioInfo and ScenarioInfo.size and ScenarioInfo.size[2]) or 1024
+            local pa = ScenarioInfo and ScenarioInfo.PlayableArea
+            local minX = (pa and pa[1]) or 0
+            local minZ = (pa and pa[2]) or 0
+            local maxX = (pa and pa[3]) or mapW
+            local maxZ = (pa and pa[4]) or mapH
+            local margin = 15
+
+            if mpos[1] <= (minX + margin) or mpos[1] >= (maxX - margin) or
+               mpos[3] <= (minZ + margin) or mpos[3] >= (maxZ - margin) then
+                self:OnImpact('Terrain', nil)
+                return
+            end
+
+            -- 2. HARD TERRAIN WATCHDOG: Detonate if hitting or clipping terrain
+            local terrY = GetSurfaceHeight(mpos[1], mpos[3])
+            if mpos[2] <= (terrY + 1.5) then
+                self:OnImpact('Terrain', nil)
+                return
+            end
+
+            -- 3. DISTANCE PHASING (standard FAF NukeProjectile profile)
+            if dist > 150 then
+                if not turningDown then
+                    self:SetTurnRate(0)
+                end
+                self.WaitTime = 4
+            elseif dist > 75 and dist <= 150 then
+                if not turningDown then
+                    self:SetTurnRate(0)
+                end
+                self.WaitTime = 3
+            elseif dist > 32 and dist <= 75 then
+                self.WaitTime = 2
+            elseif dist <= 32 then
+                -- Target arrival: pitch down steeply to plunge vertically into target
+                turningDown = true
+                self:SetTurnRate(65)
+                self.WaitTime = 1
+            end
+
+            -- 4. OVERSHOOT WATCHDOG: If closest approach passed, plunge vertically down
+            if dist > lastDist and (lastDist < 65 or turningDown) then
+                turningDown = true
+                self:SetTurnRate(90)
+                self.WaitTime = 1
+            end
+
+            lastDist = dist
+            WaitTicks(self.WaitTime)
+        end
+    end,
+
+    ---Gets the horizontal distance from the nuke to the target position
+    GetDistanceToTarget = function(self)
+        local tpos = self:GetCurrentTargetPosition()
+        if not tpos or (tpos[1] == 0 and tpos[3] == 0) then
+            return 999999
+        end
+        local mpos = self:GetPosition()
+        return VDist2(mpos[1], mpos[3], tpos[1], tpos[3])
     end,
 
     OnImpact = function(self, targetType, targetEntity)
@@ -945,7 +1051,7 @@ bp_silo = """UnitBlueprint {
             ManualFire = true,
             MaxProjectileStorage = 5,
             MaxRadius = 20000,
-            MinRadius = 150,
+            MinRadius = 0,
             MuzzleSalvoDelay = 0,
             MuzzleSalvoSize = 1,
             MuzzleVelocity = 0,
@@ -973,10 +1079,19 @@ bp_silo = """UnitBlueprint {
             RackSalvoChargeTime = 0,
             RackSalvoReloadTime = 0,
             RackSalvoSize = 1,
+            RackSlavedToTurret = false,
             RangeCategory = 'UWRC_IndirectFire',
             RateOfFire = 1,
             TargetCheckInterval = 0.5,
             TargetRestrictDisallow = 'UNTARGETABLE',
+            TurretDualManipulators = false,
+            TurretPitch = 0,
+            TurretPitchRange = 0,
+            TurretPitchSpeed = 0,
+            TurretYaw = 0,
+            TurretYawRange = 0,
+            TurretYawSpeed = 0,
+            Turreted = false,
             WeaponCategory = 'Missile',
         },
     },
@@ -1033,18 +1148,26 @@ XRA0304 = Class(CStructureUnit) {
     AutoNukeThread = function(self)
         WaitSeconds(90)
         while not self.Dead do
-            self:GiveNukeSiloAmmo(1)
+            local currentAmmo = self:GetNukeSiloAmmoCount()
+            local maxAmmo = (self.Blueprint.Weapon and self.Blueprint.Weapon[1].MaxProjectileStorage) or 5
+            if currentAmmo < maxAmmo and not self:IsUnitState('Building') then
+                self:GiveNukeSiloAmmo(1)
+                currentAmmo = currentAmmo + 1
+            end
+
             WaitSeconds(10)
-            if not self.Dead then
+            if not self.Dead and not self.BioNukeThreadRunning and currentAmmo >= 1 then
                 local army = self:GetArmy()
-                local targetPos = Targeting.GetWeightedRandomEnemyTarget(army)
-                if targetPos then
-                    local ox = (math.random() - 0.5) * 35
-                    local oz = (math.random() - 0.5) * 35
-                    local tx = targetPos[1] + ox
-                    local tz = targetPos[3] + oz
-                    local ty = GetSurfaceHeight(tx, tz)
-                    IssueNuke({self}, Vector(tx, ty, tz))
+                local targetPos = Targeting.GetWeightedEnemyTarget(army, self:GetPosition(), true)
+                if not targetPos or not Targeting.IsPositionValidAndOnMap(targetPos, 25) then
+                    targetPos = Targeting.GetFallbackEnemyTarget(army, true)
+                end
+                if targetPos and Targeting.IsPositionValidAndOnMap(targetPos, 25) then
+                    IssueNuke({self}, targetPos)
+                    WaitSeconds(12)
+                    if not self.Dead then
+                        IssueClearCommands({self})
+                    end
                 end
             end
             WaitSeconds(180)
@@ -1556,23 +1679,69 @@ with open(os.path.join(dir_proj_brood, "XRA_BroodShell01_proj.bp"), "w") as f:
     f.write(bp_broodproj)
 
 script_broodproj = """local SinglePolyTrailProjectile = import('/lua/sim/defaultprojectiles.lua').SinglePolyTrailProjectile
+local CreateEmitterAtEntity = CreateEmitterAtEntity
+local PlatoonAI = import('/mods/RaptorFaction/lua/RaptorPlatoonAI.lua')
 
-XRA_BroodShell01 = Class(SinglePolyTrailProjectile) {
+local BroodHatchEffects = {
+    '/mods/RaptorFaction/effects/emitters/raptor_blood_cloud_01_emit.bp',
+    '/mods/RaptorFaction/effects/emitters/raptor_blood_spray_01_emit.bp',
+    '/mods/RaptorFaction/effects/emitters/raptor_flesh_chunks_01_emit.bp',
+}
+
+---@class XRA_BroodShell01 : SinglePolyTrailProjectile
+XRA_BroodShell01 = ClassProjectile(SinglePolyTrailProjectile) {
     PolyTrail = '/effects/emitters/seraphim_aireau_autocannon_polytrail_01_emit.bp',
+
+    PassDamageData = function(self, damageData)
+        SinglePolyTrailProjectile.PassDamageData(self, damageData)
+        if self.DamageData then
+            self.DamageData.DamageFriendly = false
+            self.DamageData.CollideFriendly = false
+        end
+    end,
 
     OnImpact = function(self, targetType, targetEntity)
         local army = self:GetArmy()
         local pos = self:GetPosition()
+
+        if self.DamageData then
+            self.DamageData.DamageFriendly = false
+            self.DamageData.CollideFriendly = false
+        end
+
         SinglePolyTrailProjectile.OnImpact(self, targetType, targetEntity)
-        
-        -- Spawn 2 living Raptor Swarmers directly from the brood egg shell!
-        for i = 1, 2 do
-            local angle = math.random() * 2 * math.pi
-            local dist = 1.0 + math.random() * 2.0
-            local x = pos[1] + math.cos(angle) * dist
-            local z = pos[3] + math.sin(angle) * dist
-            local y = GetSurfaceHeight(x, z)
-            CreateUnitHPR('XRA0101', army, x, y, z, 0, math.random(0, 360), 0)
+
+        if pos then
+            for _, emit in BroodHatchEffects do
+                CreateEmitterAtEntity(self, army, emit):ScaleEmitter(2.5)
+            end
+        end
+
+        local brain = GetArmyBrain(army)
+        local canSpawn = true
+        if brain and brain.GetCurrentUnits and brain.GetUnitCap then
+            if brain:GetCurrentUnits() >= brain:GetUnitCap() then
+                canSpawn = false
+            end
+        end
+
+        if canSpawn and pos then
+            local count = math.random(1, 2)
+            local spawned = {}
+            for i = 1, count do
+                local angle = math.random() * 2 * math.pi
+                local dist = 1.2 + math.random() * 2.0
+                local x = pos[1] + math.cos(angle) * dist
+                local z = pos[3] + math.sin(angle) * dist
+                local y = GetSurfaceHeight(x, z)
+                local ok, unit = pcall(CreateUnitHPR, 'XRA0101', army, x, y, z, 0, math.random(0, 360), 0)
+                if ok and unit and not unit.Dead then
+                    table.insert(spawned, unit)
+                end
+            end
+            if not table.empty(spawned) and brain then
+                PlatoonAI.RegisterFieldSpawnedUnits(spawned, brain, pos)
+            end
         end
     end,
 }
@@ -1840,8 +2009,9 @@ for cfg in arty_configs:
     bp_arty_text = f"""UnitBlueprint {{
     AI = {{
         TargetBones = {{
-            'aimy',
+            'seg3',
             'head',
+            'aimy',
             'flare',
         }},
     }},
@@ -1876,7 +2046,9 @@ for cfg in arty_configs:
         'OVERLAYINDIRECTFIRE',
         'SORTSTRATEGIC',
     }},
-    CollisionOffsetY = 0.5,
+    CollisionOffsetX = 0,
+    CollisionOffsetY = 8.5,
+    CollisionOffsetZ = 3.5,
     Defense = {{
         ArmorType = 'Structure',
         EconomyThreatLevel = 40,
@@ -1918,8 +2090,8 @@ for cfg in arty_configs:
         BuildTime = 9500,
     }},
     Footprint = {{
-        SizeX = 4,
-        SizeZ = 4,
+        SizeX = 6,
+        SizeZ = 6,
     }},
     General = {{
         Category = 'Strategic',
@@ -1942,9 +2114,9 @@ for cfg in arty_configs:
     Intel = {{
         VisionRadius = 28,
     }},
-    LifeBarHeight = 0.08,
-    LifeBarOffset = 1.6,
-    LifeBarSize = 2.8,
+    LifeBarHeight = 0.12,
+    LifeBarOffset = 4.0,
+    LifeBarSize = 5.0,
     Physics = {{
         BankingSlope = 0,
         BuildOnLayerCaps = {{
@@ -1957,18 +2129,19 @@ for cfg in arty_configs:
         MinSpeedPercent = 0,
         MotionType = 'RULEUMT_None',
         OccupyGround = true,
-        SkirtOffsetX = -0.5,
-        SkirtOffsetZ = -0.5,
-        SkirtSizeX = 5,
-        SkirtSizeZ = 5,
+        SkirtOffsetX = -1.5,
+        SkirtOffsetZ = -1.5,
+        SkirtSizeX = 9,
+        SkirtSizeZ = 9,
         TurnRate = 0,
     }},
-    SelectionSizeX = 2.4,
-    SelectionSizeZ = 2.4,
+    SelectionCenterOffsetZ = 0.5,
+    SelectionSizeX = 5.5,
+    SelectionSizeZ = 5.5,
     SelectionThickness = 0.45,
-    SizeX = 2.8,
-    SizeY = 5.2,
-    SizeZ = 2.8,
+    SizeX = 8.5,
+    SizeY = 17.0,
+    SizeZ = 14.0,
     StrategicIconName = 'icon_structure3_artillery',
     StrategicIconSortPriority = 180,
     Weapon = {{
@@ -2129,13 +2302,11 @@ def clean_blueprint_faction(bp_path, is_mobile=False, is_factory=False):
     print(f"Cleaned blueprint for Faction isolation: {os.path.basename(bp_path)}")
 
 # Apply isolation across all existing units
-clean_blueprint_faction(os.path.join(dir_xra0101, "XRA0101_unit.bp"), is_mobile=True)
-clean_blueprint_faction(os.path.join(dir_xra0105, "XRA0105_unit.bp"), is_mobile=True)
-clean_blueprint_faction(os.path.join(dir_xra0201, "XRA0201_unit.bp"), is_mobile=True)
-clean_blueprint_faction(os.path.join(dir_xra0107, "XRA0107_unit.bp"), is_mobile=False, is_factory=True)
-clean_blueprint_faction(os.path.join(dir_xra0108, "XRA0108_unit.bp"), is_mobile=False)
-clean_blueprint_faction(os.path.join(dir_xra0106, "XRA0106_unit.bp"), is_mobile=False)
-clean_blueprint_faction(os.path.join(dir_xra0208, "XRA0208_unit.bp"), is_mobile=False)
+for u in os.listdir(units_root):
+    bp_path = os.path.join(units_root, u, f"{u}_unit.bp")
+    if os.path.isfile(bp_path):
+        is_fac = (u == 'XRA0107')
+        clean_blueprint_faction(bp_path, is_mobile=not is_fac, is_factory=is_fac)
 
 # ===========================================================================
 # 6. UPDATE MOD INFO & EXPORT ARCHIVE

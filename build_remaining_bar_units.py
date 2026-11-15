@@ -417,31 +417,66 @@ with open(os.path.join(dir_proj_brood_egg, "XRA_BroodEggBomb01_proj.bp"), "w") a
     f.write(bp_brood_egg)
 
 script_brood_egg = """local SinglePolyTrailProjectile = import('/lua/sim/defaultprojectiles.lua').SinglePolyTrailProjectile
+local PlatoonAI = import('/mods/RaptorFaction/lua/RaptorPlatoonAI.lua')
 
+---@class XRA_BroodEggBomb01 : SinglePolyTrailProjectile
 XRA_BroodEggBomb01 = ClassProjectile(SinglePolyTrailProjectile) {
     PolyTrail = '/effects/emitters/default_polytrail_01_emit.bp',
     PolyTrailOffset = 0,
 
+    PassDamageData = function(self, damageData)
+        SinglePolyTrailProjectile.PassDamageData(self, damageData)
+        if self.DamageData then
+            self.DamageData.DamageFriendly = false
+            self.DamageData.CollideFriendly = false
+        end
+    end,
+
     OnImpact = function(self, targetType, targetEntity)
-        local army = self.Army
+        local army = self:GetArmy()
         local pos = self:GetPosition()
-        local launcher = self:GetLauncher()
-        if launcher and not launcher.Dead then
-            local brain = launcher:GetAIBrain()
-            if brain then
-                for i = 1, 2 do
-                    local ox = (math.random() - 0.5) * 3
-                    local oz = (math.random() - 0.5) * 3
-                    local unit = brain:CreateUnitNearSpot('XRA0101', pos[1] + ox, pos[3] + oz)
-                    if unit then
-                        CreateEmitterAtEntity(unit, army, '/mods/RaptorFaction/effects/emitters/raptor_blood_spray_01_emit.bp'):ScaleEmitter(1.5)
-                        CreateEmitterAtEntity(unit, army, '/mods/RaptorFaction/effects/emitters/raptor_flesh_chunks_01_emit.bp'):ScaleEmitter(1.2)
-                    end
-                end
+
+        if self.DamageData then
+            self.DamageData.DamageFriendly = false
+            self.DamageData.CollideFriendly = false
+        end
+
+        -- Execute projectile damage first so impact blast does not hit newly spawned units
+        SinglePolyTrailProjectile.OnImpact(self, targetType, targetEntity)
+
+        if pos then
+            CreateEmitterAtEntity(self, army, '/mods/RaptorFaction/effects/emitters/raptor_blood_cloud_01_emit.bp'):ScaleEmitter(2.5)
+        end
+
+        -- Check army unit cap before spawning
+        local brain = GetArmyBrain(army)
+        local canSpawn = true
+        if brain and brain.GetCurrentUnits and brain.GetUnitCap then
+            if brain:GetCurrentUnits() >= brain:GetUnitCap() then
+                canSpawn = false
             end
         end
-        CreateEmitterAtEntity(self, army, '/mods/RaptorFaction/effects/emitters/raptor_blood_cloud_01_emit.bp'):ScaleEmitter(2.5)
-        SinglePolyTrailProjectile.OnImpact(self, targetType, targetEntity)
+
+        -- Spawn 2 living Raptor Swarmers directly on bomb impact (protected by pcall)
+        if canSpawn and pos then
+            local spawned = {}
+            for i = 1, 2 do
+                local angle = math.random() * 2 * math.pi
+                local dist = 1.0 + math.random() * 2.5
+                local x = pos[1] + math.cos(angle) * dist
+                local z = pos[3] + math.sin(angle) * dist
+                local y = GetSurfaceHeight(x, z)
+                local ok, unit = pcall(CreateUnitHPR, 'XRA0101', army, x, y, z, 0, math.random(0, 360), 0)
+                if ok and unit and not unit.Dead then
+                    CreateEmitterAtEntity(unit, army, '/mods/RaptorFaction/effects/emitters/raptor_blood_spray_01_emit.bp'):ScaleEmitter(1.5)
+                    CreateEmitterAtEntity(unit, army, '/mods/RaptorFaction/effects/emitters/raptor_flesh_chunks_01_emit.bp'):ScaleEmitter(1.2)
+                    table.insert(spawned, unit)
+                end
+            end
+            if not table.empty(spawned) and brain then
+                PlatoonAI.RegisterFieldSpawnedUnits(spawned, brain, pos)
+            end
+        end
     end,
 }
 TypeClass = XRA_BroodEggBomb01
@@ -1048,8 +1083,6 @@ bp_xra0100 = """UnitBlueprint {
         'PRODUCTSC1',
         'SELECTABLE',
         'BUILTBYRAPTORHIVE',
-        'BUILTBYTIER1FACTORY',
-        'CYBRAN',
         'RAPTOR',
         'MOBILE',
         'LAND',
@@ -1417,7 +1450,7 @@ save_sca_file(os.path.join(dir_xra0111, "XRA0111_Adeath01.sca"), num_frames, dur
 
 bp_xra0111 = """UnitBlueprint {
     Air = {
-        AutoLandTime = 0,
+        AutoLandTime = -1,
         BankFactor = 1.5,
         CanFly = true,
         CombatTurnSpeed = 2.0,
@@ -1447,8 +1480,6 @@ bp_xra0111 = """UnitBlueprint {
         'PRODUCTSC1',
         'SELECTABLE',
         'BUILTBYRAPTORHIVE',
-        'BUILTBYTIER1FACTORY',
-        'CYBRAN',
         'RAPTOR',
         'MOBILE',
         'AIR',
@@ -1650,9 +1681,6 @@ bp_xra0203 = """UnitBlueprint {
         'PRODUCTSC1',
         'SELECTABLE',
         'BUILTBYRAPTORHIVE',
-        'BUILTBYTIER1FACTORY',
-        'BUILTBYTIER2FACTORY',
-        'CYBRAN',
         'RAPTOR',
         'MOBILE',
         'LAND',
@@ -1901,7 +1929,7 @@ shutil.copyfile(os.path.join(dir_xra0104, "XRA0104_Adeath01.sca"), os.path.join(
 
 bp_xra0204 = """UnitBlueprint {
     Air = {
-        AutoLandTime = 0,
+        AutoLandTime = -1,
         BankFactor = 3,
         BankForward = false,
         BreakOffDistance = 36,
@@ -1945,9 +1973,6 @@ bp_xra0204 = """UnitBlueprint {
         'PRODUCTSC1',
         'SELECTABLE',
         'BUILTBYRAPTORHIVE',
-        'BUILTBYTIER1FACTORY',
-        'BUILTBYTIER2FACTORY',
-        'CYBRAN',
         'RAPTOR',
         'MOBILE',
         'AIR',
@@ -2041,7 +2066,9 @@ bp_xra0204 = """UnitBlueprint {
             AutoInitiateAttackCommand = true,
             BallisticArc = 'RULEUBA_None',
             BombDropThreshold = 3.5,
+            CollideFriendly = false,
             Damage = 150,
+            DamageFriendly = false,
             DamageRadius = 3.0,
             DamageType = 'Normal',
             DisplayName = 'Brood Egg Bomb',
@@ -2242,9 +2269,6 @@ bp_xra0206 = """UnitBlueprint {
         'PRODUCTSC1',
         'SELECTABLE',
         'BUILTBYRAPTORHIVE',
-        'BUILTBYTIER1FACTORY',
-        'BUILTBYTIER2FACTORY',
-        'CYBRAN',
         'RAPTOR',
         'MOBILE',
         'LAND',
@@ -2544,10 +2568,6 @@ bp_xra0302 = """UnitBlueprint {
         'PRODUCTSC1',
         'SELECTABLE',
         'BUILTBYRAPTORHIVE',
-        'BUILTBYTIER1FACTORY',
-        'BUILTBYTIER2FACTORY',
-        'BUILTBYTIER3FACTORY',
-        'CYBRAN',
         'RAPTOR',
         'MOBILE',
         'LAND',
@@ -2904,10 +2924,6 @@ bp_xra0303 = """UnitBlueprint {
         'PRODUCTSC1',
         'SELECTABLE',
         'BUILTBYRAPTORHIVE',
-        'BUILTBYTIER1FACTORY',
-        'BUILTBYTIER2FACTORY',
-        'BUILTBYTIER3FACTORY',
-        'CYBRAN',
         'RAPTOR',
         'MOBILE',
         'LAND',
@@ -2976,7 +2992,7 @@ bp_xra0303 = """UnitBlueprint {
             RULEUCC_Stop = true,
             RULEUCC_Transport = false,
         },
-        FactionName = 'Cybran',
+        FactionName = 'Raptor',
         Icon = 'amph',
         UnitName = '<LOC xra0303_name>Raptor Matriarch',
     },
@@ -3274,10 +3290,6 @@ bp_xra0310 = """UnitBlueprint {
         'PRODUCTSC1',
         'SELECTABLE',
         'BUILTBYRAPTORHIVE',
-        'BUILTBYTIER1FACTORY',
-        'BUILTBYTIER2FACTORY',
-        'BUILTBYTIER3FACTORY',
-        'CYBRAN',
         'RAPTOR',
         'MOBILE',
         'LAND',
@@ -3471,6 +3483,40 @@ with open(os.path.join(dir_xra0310, "XRA0310_script.lua"), "w") as f:
     f.write(script_xra0310)
 
 print("Ported XRA0310 Behemoth Heavy Dodo successfully.")
+
+# ===========================================================================
+# AUTOMATED FACTION ISOLATION (REMOVE FOREIGN/STANDARD CATEGORIES)
+# ===========================================================================
+print("\n--- Applying Automated Faction Isolation Across All Unit Blueprints ---")
+for u in os.listdir(units_root):
+    bp_path = os.path.join(units_root, u, f"{u}_unit.bp")
+    if not os.path.isfile(bp_path):
+        continue
+    with open(bp_path, 'r', encoding='utf-8', errors='ignore') as f:
+        content = f.read()
+    orig = content
+    cat_match = re.search(r'(Categories\s*=\s*\{)([^}]+)(\})', content)
+    if cat_match:
+        cat_header, cat_body, cat_footer = cat_match.group(1), cat_match.group(2), cat_match.group(3)
+        lines = cat_body.splitlines()
+        new_lines = []
+        for line in lines:
+            stripped = line.strip().strip("',")
+            if stripped in ('CYBRAN', 'UEF', 'AEON', 'SERAPHIM'):
+                continue
+            if stripped in ('BUILTBYTIER1FACTORY', 'BUILTBYTIER2FACTORY', 'BUILTBYTIER3FACTORY'):
+                continue
+            if stripped in ('BUILTBYTIER1ENGINEER', 'BUILTBYTIER2ENGINEER', 'BUILTBYTIER3ENGINEER', 'BUILTBYCOMMANDER'):
+                continue
+            new_lines.append(line)
+        cleaned_body = re.sub(r'\n\s*\n', '\n', '\n'.join(new_lines))
+        content = content[:cat_match.start()] + cat_header + cleaned_body + cat_footer + content[cat_match.end():]
+    content = re.sub(r"FactionName\s*=\s*'Cybran'", "FactionName = 'Raptor'", content)
+    content = re.sub(r'FactionName\s*=\s*"Cybran"', "FactionName = 'Raptor'", content)
+    if content != orig:
+        with open(bp_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+        print(f"Isolated: {u}_unit.bp")
 
 # ===========================================================================
 # UPDATE MOD INFO & EXPORT ARCHIVE

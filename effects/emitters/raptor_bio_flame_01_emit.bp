@@ -1,0 +1,102 @@
+EmitterBlueprint {
+    BlueprintId = 'raptor_bio_flame_01',
+    Lifetime = 1.50,
+    Repeattime = 1.50,
+    TextureFramecount = 1.00,
+    Blendmode = 3.00,
+    LocalVelocity = false,
+    LocalAcceleration = false,
+    Gravity = false,
+    AlignRotation = false,
+    AlignToBone = false,
+    Flat = false,
+    LODCutoff = 300.00,
+    EmitIfVisible = true,
+    CatchupEmit = true,
+    CreateIfVisible = false,
+    SnapToWaterline = false,
+    OnlyEmitOnWater = false,
+    InterpolateEmission = true,
+    TextureStripcount = 4.00,
+    SortOrder = 10.00,
+    Texture = '/textures/particles/fire_flame_add_05.dds',
+    RampTexture = '/textures/particles/ramp_fire_09.dds',
+    XDirectionCurve = {
+        XRange = 1.00,
+        Keys = {
+            { x=0.50, y=0.00, z=0.30 },
+        },
+    },
+    YDirectionCurve = {
+        XRange = 1.00,
+        Keys = {
+            { x=0.50, y=0.20, z=0.30 },
+        },
+    },
+    ZDirectionCurve = {
+        XRange = 1.00,
+        Keys = {
+            { x=0.50, y=0.00, z=0.30 },
+        },
+    },
+    EmitRateCurve = {
+        XRange = 1.00,
+        Keys = {
+            { x=0.50, y=45.00, z=0.00 },
+        },
+    },
+    LifetimeCurve = {
+        XRange = 1.00,
+        Keys = {
+            { x=0.50, y=0.45, z=0.10 },
+        },
+    },
+    VelocityCurve = {
+        XRange = 1.00,
+        Keys = {
+            { x=0.50, y=1.20, z=0.50 },
+        },
+    },
+    StartSizeCurve = {
+        XRange = 1.00,
+        Keys = {
+            { x=0.50, y=0.40, z=0.15 },
+        },
+    },
+    EndSizeCurve = {
+        XRange = 1.00,
+        Keys = {
+            { x=0.50, y=1.80, z=0.30 },
+        },
+    },
+    InitialRotationCurve = {
+        XRange = 1.00,
+        Keys = {
+            { x=0.50, y=180.00, z=360.00 },
+        },
+    },
+    RotationRateCurve = {
+        XRange = 1.00,
+        Keys = {
+            { x=0.50, y=15.00, z=20.00 },
+        },
+    },
+    FrameRateCurve = {
+        XRange = 1.00,
+        Keys = {
+            { x=0.50, y=1.00, z=0.00 },
+        },
+    },
+    TextureSelectionCurve = {
+        XRange = 1.00,
+        Keys = {
+            { x=0.50, y=2.00, z=4.00 },
+        },
+    },
+    RampSelectionCurve = {
+        XRange = 1.00,
+        Keys = {
+            { x=0.50, y=0.00, z=0.00 },
+        },
+    },
+}

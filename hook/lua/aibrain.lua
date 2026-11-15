@@ -29,4 +29,15 @@ AIBrain = Class(OldAIBrain) {
 
         return OldAIBrain.InitializeSkirmishSystems(self)
     end,
+
+    OnDefeat = function(self)
+        if self.IsRaptorSwarm then
+            local Spawner = import('/mods/RaptorFaction/lua/RaptorSpawner.lua')
+            if Spawner and Spawner.GetQueensKilled and Spawner.GetQueensKilled() == 0 then
+                LOG("* RAPTOR FACTION: Suppressing premature OnDefeat - Queen Titan has not been slain yet!")
+                return
+            end
+        end
+        return OldAIBrain.OnDefeat(self)
+    end,
 }

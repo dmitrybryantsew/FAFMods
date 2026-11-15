@@ -65,11 +65,6 @@ XRA0401 = ClassUnit(CWalkingLandUnit) {
             CreateEmitterAtEntity(self, army, emit):ScaleEmitter(8.0)
         end
 
-        Sync.RaptorAnnounce = {
-            Text = "VICTORY: THE MATRIARCH QUEEN TITAN HAS FALLEN! THE RAPTOR HORDE COLLAPSES!",
-            Color = 'yellow'
-        }
-
         Eggs.SpawnRaptorEgg(self)
         CWalkingLandUnit.OnKilled(self, instigator, type, overkillRatio)
     end,

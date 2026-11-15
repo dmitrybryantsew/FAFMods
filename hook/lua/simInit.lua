@@ -12,6 +12,18 @@ local OldBeginSession = BeginSession
 function BeginSession()
     OldBeginSession()
 
+    -- Asynchronously pre-generate / bake FAF NavMesh so terrain is cached immediately
+    ForkThread(function()
+        local okNav, NavUtils = pcall(import, '/lua/sim/NavUtils.lua')
+        if okNav and NavUtils and not NavUtils.IsGenerated() then
+            LOG("* RAPTOR NAV: Pre-generating FAF NavMesh at match start...")
+            pcall(NavUtils.Generate)
+            if NavUtils.IsGenerated() then
+                LOG("* RAPTOR NAV: FAF NavMesh generation completed successfully.")
+            end
+        end
+    end)
+
     ForkThread(function()
         WaitSeconds(1.5)
         local Spawner = import('/mods/RaptorFaction/lua/RaptorSpawner.lua')

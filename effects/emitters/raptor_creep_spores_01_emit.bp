@@ -1,0 +1,58 @@
+EmitterBlueprint {
+    BlueprintId = 'raptor_creep_spores_01',
+    Lifetime = -1.00,
+    Repeattime = 1.00,
+    TextureFramecount = 1.00,
+    Blendmode = 1.00,
+    LocalVelocity = false,
+    LocalAcceleration = false,
+    Gravity = false,
+    AlignRotation = false,
+    AlignToBone = false,
+    Flat = true,
+    LODCutoff = 250.00,
+    EmitIfVisible = true,
+    CatchupEmit = true,
+    CreateIfVisible = false,
+    SnapToWaterline = false,
+    OnlyEmitOnWater = false,
+    InterpolateEmission = true,
+    TextureStripcount = 1.00,
+    SortOrder = 0.00,
+    Texture = '/textures/particles/cloud_smoke_alpha_03.dds',
+    RampTexture = '/textures/particles/ramp_green_02.dds',
+    XDirectionCurve = {
+        XRange = 1.00,
+        Keys = { { x=0.50, y=0.00, z=0.40 } },
+    },
+    YDirectionCurve = {
+        XRange = 1.00,
+        Keys = { { x=0.50, y=0.15, z=0.08 } },
+    },
+    ZDirectionCurve = {
+        XRange = 1.00,
+        Keys = { { x=0.50, y=0.00, z=0.40 } },
+    },
+    EmitRateCurve = {
+        XRange = 1.00,
+        Keys = { { x=0.00, y=3.00, z=0.00 }, { x=1.00, y=3.00, z=0.00 } },
+    },
+    LifetimeCurve = {
+        XRange = 1.00,
+        Keys = { { x=0.50, y=3.20, z=0.50 } },
+    },
+    VelocityCurve = {
+        XRange = 1.00,
+        Keys = { { x=0.20, y=0.40, z=0.10 }, { x=0.80, y=0.15, z=0.05 } },
+    },
+    SizeCurve = {
+        XRange = 1.00,
+        Keys = {
+            { x=0.00, y=1.20, z=0.20 },
+            { x=0.50, y=2.80, z=0.40 },
+            { x=1.00, y=3.50, z=0.30 },
+        },
+    },
+    StartSize = 1.50,
+    EndSize = 4.00,
+}

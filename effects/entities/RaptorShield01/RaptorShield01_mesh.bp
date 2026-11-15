@@ -1,0 +1,15 @@
+MeshBlueprint {
+    IconFadeInZoom = 4,
+    LODs = {
+        {
+            MeshName = '/effects/Entities/Sphere01/Sphere01_lod0.scm',
+            AlbedoName = '/mods/RaptorFaction/effects/entities/RaptorShield01/RaptorShield01_Albedo.dds',
+            SecondaryName = '/mods/RaptorFaction/effects/entities/RaptorShield01/RaptorShield01_Secondary.dds',
+            SpecularName = '/mods/RaptorFaction/effects/entities/RaptorShield01/RaptorShield01_Specular.dds',
+            ShaderName = 'ShieldNomads',
+            LODCutoff = 1000,
+        },
+    },
+    SortOrder = 1000,
+    StraddleWater = true,
+}

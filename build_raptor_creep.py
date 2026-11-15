@@ -113,15 +113,16 @@ arr_b = np.array(b_a, dtype=np.float32)
 arr_h = np.array(h_a, dtype=np.float32) / 255.0
 
 # Boost biological crimson/purple saturation so it stands out strongly from orbital zoom
-arr_r = np.clip(arr_r * 1.25, 0, 255)
-arr_g = np.clip(arr_g * 0.90, 0, 255)
-arr_b = np.clip(arr_b * 1.15, 0, 255)
+arr_r = np.clip(arr_r * 1.30, 0, 255)
+arr_g = np.clip(arr_g * 0.78, 0, 255)
+arr_b = np.clip(arr_b * 1.20, 0, 255)
 
 raw_normals = get_bar_file('luaui/images/raptor_scum/alien_guts_normalspec.dds')
 img_normals = Image.open(io.BytesIO(raw_normals)).resize((1024, 1024), Image.Resampling.LANCZOS)
 r_n, g_n, b_n, a_spec = img_normals.split()
 arr_nx = np.array(r_n, dtype=np.uint8) # Tangent Normal X
 arr_ny = np.array(g_n, dtype=np.uint8) # Tangent Normal Y
+arr_nz = np.array(b_n, dtype=np.uint8) # Tangent Normal Z
 
 # Normalized coordinates: center = (511.5, 511.5), 0 at center, 1.0 at quad mid-edges
 y, x = np.ogrid[:1024, :1024]
@@ -132,32 +133,30 @@ dist = np.sqrt(dx**2 + dy**2)
 angle = np.arctan2(dy, dx)
 
 # Multi-harmonic organic lobes (spidering tendril fingers)
-lobe1 = np.sin(angle * 5.0 + 0.4) * 0.08
-lobe2 = np.cos(angle * 8.0 - 1.2) * 0.05
-lobe3 = np.sin(angle * 14.0 + 1.8) * 0.03
+lobe1 = np.sin(angle * 5.0 + 0.4) * 0.09
+lobe2 = np.cos(angle * 8.0 - 1.2) * 0.06
+lobe3 = np.sin(angle * 13.0 + 1.8) * 0.035
 lobe_noise = lobe1 + lobe2 + lobe3
 
-eff_dist = dist - lobe_noise - (arr_h - 0.5) * 0.12
+eff_dist = dist - lobe_noise - (arr_h - 0.5) * 0.10
 
-# Solid central core (under the nest)
-core_mask = np.clip((0.32 - dist) / 0.18, 0.0, 1.0)
+# Robust Solid Core (45% of quad is solid opaque bio-membrane without holes)
+core_mask = np.clip((0.46 - dist) / 0.12, 0.0, 1.0)
 core_mask = core_mask * core_mask * (3.0 - 2.0 * core_mask)
 
-# Outer falloff: all tendrils terminate well inside 0.65
-r_inner = 0.22
-r_outer = 0.63
+# Outer falloff: tendrils reach out to 0.78
+r_inner = 0.38
+r_outer = 0.78
 falloff = np.clip((r_outer - eff_dist) / (r_outer - r_inner), 0.0, 1.0)
 smooth_falloff = falloff * falloff * (3.0 - 2.0 * falloff)
 
-# Tissue weighting: high height veins stay prominent, crevices fade into terrain
-tissue_weight = 0.50 + 0.50 * arr_h
-alpha_creep = smooth_falloff * tissue_weight
+# Vein prominence: veins stay prominent, crevices blend into terrain
+tissue_weight = 0.65 + 0.35 * arr_h
+alpha_tendrils = smooth_falloff * tissue_weight
 
-# Blend core so the center is dense and punchy
-final_alpha = np.maximum(alpha_creep, core_mask * 0.98)
-
-# Absolute safety boundary: beyond dist >= 0.65, force 0.0 (wide transparent padding to quad edge at 1.0)
-final_alpha = np.where(dist >= 0.65, 0.0, final_alpha)
+# Blend core so the center is 100% dense, rich and opaque
+final_alpha = np.maximum(alpha_tendrils, core_mask)
+final_alpha = np.where(dist >= 0.80, 0.0, final_alpha)
 final_alpha_u8 = np.clip(final_alpha * 255.0, 0, 255).astype(np.uint8)
 
 # 1. Albedo: RGBA
@@ -168,32 +167,32 @@ albedo_final = Image.merge('RGBA', (
     Image.fromarray(final_alpha_u8)
 ))
 
-# 2. FAF Normal:
-# In FAF's DecalsNormalsPS (terrain.fx):
-#   blendFactor = decalRaw.r (R channel is the BLEND MASK!)
-#   decalNormal.xz = decalRaw.ag * 2 - 1 (G is Normal Y, A is Normal X)
-#   B is unused (0)
-zeros = np.zeros_like(final_alpha_u8)
+# 2. Standard D3D9 Tangent Normal Map with Alpha Blend Mask:
+# R = Normal X, G = Normal Y, B = Normal Z, A = Blend Mask
 normals_final = Image.merge('RGBA', (
-    Image.fromarray(final_alpha_u8), # R = Blend Mask (0 outside tendrils!)
-    Image.fromarray(arr_ny),         # G = Normal Y
-    Image.fromarray(zeros),          # B = 0
-    Image.fromarray(arr_nx)          # A = Normal X
+    Image.fromarray(arr_nx),
+    Image.fromarray(arr_ny),
+    Image.fromarray(arr_nz),
+    Image.fromarray(final_alpha_u8)
 ))
 
-out_albedo_path = os.path.join(decal_dir, 'raptor_creep_albedo.dds')
-out_normals_path = os.path.join(decal_dir, 'raptor_creep_normals.dds')
-out_sub_albedo_path = os.path.join(decal_dir, 'raptor_creep_sub_albedo.dds')
-out_sub_normals_path = os.path.join(decal_dir, 'raptor_creep_sub_normals.dds')
+repo_decal_dir = os.path.join(os.path.dirname(__file__), 'env', 'decals')
+os.makedirs(repo_decal_dir, exist_ok=True)
 
-save_bgra_dds_with_mipmaps(albedo_final, out_albedo_path)
-save_bgra_dds_with_mipmaps(normals_final, out_normals_path)
+for target_dir in [decal_dir, repo_decal_dir]:
+    out_albedo_path = os.path.join(target_dir, 'raptor_creep_albedo.dds')
+    out_normals_path = os.path.join(target_dir, 'raptor_creep_normals.dds')
+    out_sub_albedo_path = os.path.join(target_dir, 'raptor_creep_sub_albedo.dds')
+    out_sub_normals_path = os.path.join(target_dir, 'raptor_creep_sub_normals.dds')
 
-# Rotated variants for natural non-repeating lobe tiling
-save_bgra_dds_with_mipmaps(albedo_final.rotate(72), out_sub_albedo_path)
-save_bgra_dds_with_mipmaps(normals_final.rotate(72), out_sub_normals_path)
+    save_bgra_dds_with_mipmaps(albedo_final, out_albedo_path)
+    save_bgra_dds_with_mipmaps(normals_final, out_normals_path)
 
-print("Organic Creep decals with full 11-level mipmaps exported successfully.")
+    # Rotated variants for natural non-repeating lobe tiling
+    save_bgra_dds_with_mipmaps(albedo_final.rotate(72), out_sub_albedo_path)
+    save_bgra_dds_with_mipmaps(normals_final.rotate(72), out_sub_normals_path)
+
+print("Organic Creep decals with full 11-level mipmaps exported successfully to mod and repo.")
 
 # ---------------------------------------------------------------------------
 # 3. Particle Emitters

@@ -14,6 +14,7 @@ import os
 import io
 import math
 import struct
+import re
 import shutil
 import zipfile
 from PIL import Image
@@ -167,7 +168,7 @@ def euler_to_quat(rot_x, rot_y, rot_z):
     qw = cx * cy * cz + sx * sy * sz
     qx = sx * cy * cz - cx * sy * sz
     qy = cx * sy * cz + sx * cy * sz
-    qz = cx * cy * sz - sx * sz * cz
+    qz = cx * cy * sz - sx * sy * cz
     return (qw, qx, qy, qz)
 
 def save_sca_file(filepath, num_frames, duration, piece_names, parent_indices, frames_data):
@@ -232,34 +233,38 @@ def generate_procedural_anims(pieces, walk_path, death_path, motion_type="LAND")
                 elif 'body' in low or 'center' in low:
                     rot[b_name] = (math.sin(p) * math.radians(3.0), 0, 0)
         else:
-            # Land Walker (Biped / Quadruped)
+            # Land Walker (Biped / Quadruped / Insect)
             for b_name in names:
                 low = b_name.lower()
                 is_back = 'b' in low
                 phase_offset = math.pi if is_back else 0.0
                 sign = 1.0 if 'l' in low else -1.0
+                leg_phase = p + phase_offset
 
                 if 'thigh' in low or 'upperleg' in low:
-                    rot[b_name] = (math.sin(p + phase_offset) * math.radians(32.0) * sign, 0, 0)
-                elif 'knee' in low or 'shin' in low or 'foot' in low:
-                    rot[b_name] = (-max(0.0, math.sin((p + phase_offset) * sign)) * math.radians(35.0), 0, 0)
+                    rot[b_name] = (math.sin(leg_phase) * math.radians(26.0) * sign, 0, 0)
+                elif 'knee' in low:
+                    rot[b_name] = (-max(0.0, math.sin(leg_phase * sign)) * math.radians(24.0), 0, 0)
+                elif 'shin' in low:
+                    rot[b_name] = (max(0.0, math.sin(leg_phase * sign)) * math.radians(16.0), 0, 0)
+                elif 'foot' in low:
+                    rot[b_name] = (-max(0.0, math.sin(leg_phase * sign)) * math.radians(8.0), 0, 0)
                 elif 'arm' in low or 'blade' in low:
-                    rot[b_name] = (0, math.sin(p) * math.radians(12.0) * sign, 0)
+                    rot[b_name] = (0, math.sin(p) * math.radians(10.0) * sign, 0)
                 elif 'tail' in low:
                     rot[b_name] = (0, math.sin(p) * math.radians(12.0), 0)
+                elif 'head' in low:
+                    rot[b_name] = (-math.sin(p * 2.0) * math.radians(1.5), 0, 0)
                 elif 'body' in low:
-                    rot[b_name] = (math.sin(p * 2.0) * math.radians(3.0), 0, 0)
+                    rot[b_name] = (math.sin(p * 2.0) * math.radians(2.0), 0, math.sin(p) * math.radians(1.5))
+                    pos[b_name] = (pos[b_name][0], pos[b_name][1] + math.sin(p * 2.0) * 0.035, pos[b_name][2])
 
         time_sec = t * dur
         frames.extend([time_sec, 0])
         for b_idx, b_name in enumerate(names):
             rx, ry, rz = rot.get(b_name, (0.0, 0.0, 0.0))
             qw, qx, qy, qz = euler_to_quat(rx, ry, rz)
-            if f_idx == 0 and b_idx == 0:
-                px, py, pz = 0.0, 0.0, 0.0
-                qw, qx, qy, qz = 1.0, 0.0, 0.0, 0.0
-            else:
-                px, py, pz = pos[b_name]
+            px, py, pz = pos[b_name]
             frames.extend([px, py, pz, qw, qx, qy, qz])
 
     save_sca_file(walk_path, num_frames, dur, names, parents, frames)
@@ -280,11 +285,7 @@ def generate_procedural_anims(pieces, walk_path, death_path, motion_type="LAND")
         for b_idx, b_name in enumerate(names):
             rx, ry, rz = rot.get(b_name, (0.0, 0.0, 0.0))
             qw, qx, qy, qz = euler_to_quat(rx, ry, rz)
-            if f_idx == 0 and b_idx == 0:
-                px, py, pz = 0.0, 0.0, 0.0
-                qw, qx, qy, qz = 1.0, 0.0, 0.0, 0.0
-            else:
-                px, py, pz = pos[b_name]
+            px, py, pz = pos[b_name]
             dframes.extend([px, py, pz, qw, qx, qy, qz])
 
     save_sca_file(death_path, d_frames, d_dur, names, parents, dframes)
@@ -343,7 +344,7 @@ MODELS_TO_IMPORT = [
         "scale": 0.065, "hp": 1650, "regen": 3.0, "speed": 3.2,
         "mass": 420, "energy": 5500, "buildtime": 1200,
         "size_x": 1.8, "size_y": 1.4, "size_z": 1.9,
-        "categories": ["LAND", "MOBILE", "DEFENSE", "SHIELD", "TECH2", "BUILTBYRAPTORHIVE", "RAPTOR", "AMPHIBIOUS"],
+        "categories": ["LAND", "MOBILE", "DEFENSE", "SHIELD", "ANTIAIR", "TECH2", "BUILTBYRAPTORHIVE", "RAPTOR", "AMPHIBIOUS"],
         "abilities": ["Mobile Bio-Carapace Shield (2,800 HP)", "Anti-Air Aero Spores", "Amphibious"],
         "has_shield": True, "shield_hp": 2800, "shield_size": 18,
         "weapons": [{
@@ -426,7 +427,7 @@ MODELS_TO_IMPORT = [
         "scale": 0.075, "hp": 28000, "regen": 18.0, "speed": 2.8,
         "mass": 6200, "energy": 95000, "buildtime": 12000,
         "size_x": 3.6, "size_y": 3.2, "size_z": 4.2,
-        "categories": ["LAND", "MOBILE", "DIRECTFIRE", "EXPERIMENTAL", "TECH3", "BUILTBYRAPTORHIVE", "RAPTOR", "AMPHIBIOUS"],
+        "categories": ["LAND", "MOBILE", "DIRECTFIRE", "ANTIAIR", "EXPERIMENTAL", "TECH3", "BUILTBYRAPTORHIVE", "RAPTOR", "AMPHIBIOUS"],
         "abilities": ["Amphibious", "Apex Herald Titan", "Multi-Vector Plasma Blob", "Tracking Spore Swarm", "Regenerates (+18 hp/s)"],
         "weapons": [
             {
@@ -439,7 +440,7 @@ MODELS_TO_IMPORT = [
             },
             {
                 "name": "Apex Dragon Spores",
-                "damage": 60, "rof": 2.5, "range": 42, "target": "BOTH"
+                "damage": 60, "rof": 2.5, "range": 42, "target": "AIR"
             }
         ]
     }
@@ -547,14 +548,47 @@ def run_import():
                 w_range = w["range"]
                 target_type = w.get("target", "LAND")
                 if target_type == "AIR":
-                    target_caps = "Air = 'Air', Land = 'Air'"
+                    target_caps = "Air = 'Air', Land = 'Air', Water = 'Air', Seabed = 'Air'"
                     rcat = "UWRC_AntiAir"
+                    wcat = "Anti Air"
+                    ballistic = "RULEUBA_None"
+                    is_turreted = False
+                    cant_ground = "CannotAttackGround = true,"
+                    auto_init = ""
+                    priorities = """                'SPECIALHIGHPRI',
+                'AIR MOBILE EXPERIMENTAL',
+                'AIR MOBILE BOMBER',
+                'AIR MOBILE GROUNDATTACK',
+                'AIR MOBILE',
+                'ALLUNITS',"""
                 elif target_type == "BOTH":
-                    target_caps = "Air = 'Air|Land', Land = 'Air|Land', Water = 'Air|Land'"
+                    target_caps = "Air = 'Air|Land', Land = 'Air|Land', Water = 'Air|Land', Seabed = 'Air|Land'"
                     rcat = "UWRC_DirectFire"
+                    wcat = "Direct Fire"
+                    ballistic = "RULEUBA_LowArc"
+                    is_turreted = False if uid == 'XRA0121' else True
+                    cant_ground = ""
+                    auto_init = "AutoInitiateAttackCommand = true,"
+                    priorities = """                'COMMAND',
+                'EXPERIMENTAL',
+                'TECH3',
+                'TECH2',
+                'TECH1',
+                'ALLUNITS',"""
                 else:
-                    target_caps = "Air = 'Land|Water', Land = 'Land|Water', Water = 'Land|Water'"
+                    target_caps = "Air = 'Land|Water|Seabed', Land = 'Land|Water|Seabed', Water = 'Land|Water|Seabed', Seabed = 'Land|Water|Seabed'"
                     rcat = "UWRC_DirectFire"
+                    wcat = "Direct Fire"
+                    ballistic = "RULEUBA_LowArc"
+                    is_turreted = False if uid == 'XRA0121' else True
+                    cant_ground = ""
+                    auto_init = "AutoInitiateAttackCommand = true,"
+                    priorities = """                'COMMAND',
+                'EXPERIMENTAL',
+                'TECH3',
+                'TECH2',
+                'TECH1',
+                'ALLUNITS',"""
 
                 w_low = w_name.lower()
                 if "spore" in w_low:
@@ -588,6 +622,7 @@ def run_import():
             BombDropThreshold = 3.5,
             CollideFriendly = false,
             Damage = {w_dmg},
+            DamageFriendly = false,
             DamageRadius = 3.5,
             DamageType = 'Normal',
             DisplayName = '{w_name}',
@@ -642,6 +677,41 @@ def run_import():
 
                 w_label = f"Weapon{widx+1}"
 
+                if target_type == "AIR" and "spike1" in piece_names:
+                    w_muzzle_bones = "'spike1',\n                        'spike2',\n                        'spike3'"
+                    w_rack_bone = "body"
+                    w_fire_together = "true"
+                    w_proj_count = 3
+                    w_salvo_size = 3
+                    w_tol = 180
+                else:
+                    w_muzzle_bones = f"'{muzzle_candidate}'"
+                    w_rack_bone = muzzle_candidate
+                    w_fire_together = "false"
+                    w_proj_count = 1
+                    w_salvo_size = 1
+                    w_tol = 180 if target_type == "AIR" else 2
+
+                turret_str = ""
+                if is_turreted:
+                    turret_str = f"""TurretBoneMuzzle = '{muzzle_candidate}',
+            TurretBonePitch = '{pitch_candidate}',
+            TurretBoneYaw = '{yaw_candidate}',
+            TurretDualManipulators = false,
+            TurretPitch = 0,
+            TurretPitchRange = {0 if uid == 'XRA0121' else 45},
+            TurretPitchSpeed = {0 if uid == 'XRA0121' else 60},
+            TurretYaw = 0,
+            TurretYawRange = {0 if uid == 'XRA0121' else 180},
+            TurretYawSpeed = {0 if uid == 'XRA0121' else 90},
+            Turreted = true,"""
+                else:
+                    turret_str = "Turreted = false,"
+
+                cant_ground_str = f"\n            {cant_ground}" if cant_ground else ""
+                auto_init_str = f"\n            {auto_init}" if auto_init else ""
+                prefers_primary_str = "\n            PrefersPrimaryWeaponTarget = true," if widx == 1 and uid == "XRA0329" else ""
+
                 weapons_bp_list.append(f"""        {{
             AboveWaterTargetsOnly = true,
             Audio = {{
@@ -650,8 +720,8 @@ def run_import():
                     Cue = 'Attack',
                     LodCutoff = 'Weapon_LodCutoff',
                 }},
-            }},
-            BallisticArc = 'RULEUBA_LowArc',
+            }},{auto_init_str}{cant_ground_str}{prefers_primary_str}
+            BallisticArc = '{ballistic}',
             CollideFriendly = false,
             Damage = {w_dmg},
             DamageRadius = 1.0,
@@ -660,24 +730,24 @@ def run_import():
             FireTargetLayerCapsTable = {{
                 {target_caps}
             }},
-            FiringTolerance = 2,
+            FiringTolerance = {w_tol},
             Label = '{w_label}',
             MaxRadius = {w_range},
             MuzzleSalvoDelay = 0.1,
-            MuzzleSalvoSize = 1,
+            MuzzleSalvoSize = {w_salvo_size},
             MuzzleVelocity = 35,
             ProjectileId = '{proj_id}',
             ProjectileLifetimeUsesMultiplier = 1.15,
-            ProjectilesPerOnFire = 1,
+            ProjectilesPerOnFire = {w_proj_count},
             RackBones = {{
                 {{
                     MuzzleBones = {{
-                        '{muzzle_candidate}',
+                        {w_muzzle_bones},
                     }},
-                    RackBone = '{muzzle_candidate}',
+                    RackBone = '{w_rack_bone}',
                 }},
             }},
-            RackFireTogether = false,
+            RackFireTogether = {w_fire_together},
             RackRecoilDistance = 0,
             RackReloadTimeout = 10,
             RackSalvoChargeTime = 0,
@@ -688,25 +758,12 @@ def run_import():
             RateOfFire = {w_rof},
             TargetCheckInterval = 0.3,
             TargetPriorities = {{
-                'COMMAND',
-                'EXPERIMENTAL',
-                'TECH3',
-                'TECH2',
-                'TECH1',
-                'ALLUNITS',
+{priorities}
             }},
             TargetRestrictDisallow = 'UNTARGETABLE',
-            TrackingRadius = 1.4 if uid == 'XRA0121' else 1.15,
-            TurretBoneMuzzle = '{muzzle_candidate}',
-            TurretDualManipulators = false,
-            TurretPitch = 0,
-            TurretPitchRange = 0 if uid == 'XRA0121' else 45,
-            TurretPitchSpeed = 0 if uid == 'XRA0121' else 60,
-            TurretYaw = 0,
-            TurretYawRange = 0 if uid == 'XRA0121' else 180,
-            TurretYawSpeed = 0 if uid == 'XRA0121' else 90,
-            Turreted = False if uid == 'XRA0121' else True,
-            WeaponCategory = 'Direct Fire',
+            TrackingRadius = {1.4 if uid == 'XRA0121' else 1.15},
+            {turret_str}
+            WeaponCategory = '{wcat}',
         }},""")
 
             weapons_str = "\n".join(weapons_bp_list)
@@ -717,9 +774,9 @@ def run_import():
                 s_hp = u["shield_hp"]
                 s_sz = u["shield_size"]
                 shield_bp_str = f"""        Shield = {{
-            ImpactEffects = 'CybranShieldHit01',
+            ImpactEffects = 'RaptorShieldHit01',
             ImpactMesh = '/effects/entities/ShieldSection01/ShieldSection01_mesh',
-            Mesh = '/effects/entities/CybranShield01/CybranShield01_mesh',
+            Mesh = '/mods/RaptorFaction/effects/entities/RaptorShield01/RaptorShield01_mesh',
             MeshZMult = 1,
             RegenAssistMult = 60,
             ShieldEnergyDrainRechargeTime = 5,
@@ -743,7 +800,7 @@ def run_import():
             if 'ANTIAIR' in unit_cats and 'OVERLAYANTIAIR' not in unit_cats:
                 unit_cats.append('OVERLAYANTIAIR')
             cats_str = ",\n        ".join(f"'{c}'" for c in unit_cats)
-            abilities_str = ",\n        ".join(f"'<LOC>{a}'" for a in u["abilities"])
+            abilities_str = ",\n        ".join(f"'<LOC ability_{re.sub(r'[^a-zA-Z0-9]+', '_', a).strip('_').lower()}>{a}'" for a in u["abilities"])
 
             # Strategic icon
             if uid == "XRA0121":
@@ -798,7 +855,7 @@ def run_import():
             else:
                 elevation_str = "Elevation = 14.0," if is_flying else ""
                 air_bp = f"""    Air = {{
-        AutoLandTime = 0,
+        AutoLandTime = -1,
         BankFactor = 1.5,
         BankForward = false,
         BreakOffDistance = 32,

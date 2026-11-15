@@ -1,0 +1,61 @@
+EmitterBlueprint {
+    BlueprintId = 'raptor_bio_heal_burst_01',
+    Lifetime = 1.20,
+    Repeattime = 1.20,
+    TextureFramecount = 16.00,
+    Blendmode = 0.00,
+    LocalVelocity = false,
+    LocalAcceleration = false,
+    Gravity = false,
+    AlignRotation = false,
+    AlignToBone = false,
+    Flat = true,
+    LODCutoff = 200.00,
+    EmitIfVisible = true,
+    CatchupEmit = true,
+    CreateIfVisible = false,
+    SnapToWaterline = false,
+    OnlyEmitOnWater = false,
+    InterpolateEmission = false,
+    TextureStripcount = 4.00,
+    SortOrder = 0.00,
+    Texture = '/textures/particles/mudpot_bubble_anim_01.dds',
+    RampTexture = '/textures/particles/ramp_green_02.dds',
+    XDirectionCurve = {
+        XRange = 1.20,
+        Keys = { { x=0.50, y=0.00, z=0.20 } },
+    },
+    YDirectionCurve = {
+        XRange = 1.20,
+        Keys = { { x=0.50, y=0.10, z=0.05 } },
+    },
+    ZDirectionCurve = {
+        XRange = 1.20,
+        Keys = { { x=0.50, y=0.00, z=0.20 } },
+    },
+    EmitRateCurve = {
+        XRange = 1.20,
+        Keys = {
+            { x=0.10, y=4.00, z=0.00 },
+            { x=0.60, y=0.00, z=0.00 },
+        },
+    },
+    LifetimeCurve = {
+        XRange = 1.20,
+        Keys = { { x=0.50, y=0.80, z=0.10 } },
+    },
+    VelocityCurve = {
+        XRange = 1.20,
+        Keys = { { x=0.50, y=0.05, z=0.02 } },
+    },
+    SizeCurve = {
+        XRange = 1.20,
+        Keys = {
+            { x=0.00, y=0.60, z=0.10 },
+            { x=0.50, y=1.20, z=0.20 },
+            { x=1.00, y=1.60, z=0.20 },
+        },
+    },
+    StartSize = 0.60,
+    EndSize = 1.40,
+}

@@ -1,0 +1,24 @@
+ProjectileBlueprint {
+    Audio = {
+        NukeExplosion = Sound {
+            Bank = 'Raptor_Nuke_Explosion',
+            Cue = 'Explosion',
+            LodCutoff = 'Weapon_LodCutoff',
+        },
+    },
+    Description = 'Raptor Apex Bio-Nuke Explosion Controller',
+    Display = {
+        StrategicIconSize = 3,
+    },
+    Physics = {
+        CollideEntity = false,
+        CollideSurface = false,
+        DestroyOnWater = false,
+        InitialSpeed = 0,
+        Lifetime = 100,
+        RotationalVelocity = 0,
+        RotationalVelocityRange = 0,
+        UseGravity = false,
+        VelocityAlign = false,
+    },
+}

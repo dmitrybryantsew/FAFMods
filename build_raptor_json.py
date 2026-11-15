@@ -17,8 +17,8 @@ OUTPUT_FILE = DATA_DIR / "raptor_units.json"
 def clean_loc(text):
     if not isinstance(text, str):
         return text
-    # e.g. "<LOC xra0100_name>Raptor Larva" -> "Raptor Larva"
-    return re.sub(r'<LOC\s+[^>]*>', '', text).strip()
+    # e.g. "<LOC xra0100_name>Raptor Larva" -> "Raptor Larva" or "<LOC>Amphibious" -> "Amphibious"
+    return re.sub(r'<LOC\s*[^>]*>', '', text).strip()
 
 def calculate_dps(weapon):
     damage = weapon.get("Damage", 0)
